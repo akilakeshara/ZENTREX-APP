@@ -8,6 +8,7 @@ class ZentrexVpnService {
   late final V2ray v2ray;
   bool _isInitialized = false;
   String? _lastConfigJson;
+  String currentStatus = "DISCONNECTED";
   final StreamController<V2RayStatus> _statusController =
       StreamController<V2RayStatus>.broadcast();
 
@@ -15,6 +16,7 @@ class ZentrexVpnService {
   ZentrexVpnService._privateConstructor() {
     v2ray = V2ray(
       onStatusChanged: (V2RayStatus status) {
+        currentStatus = status.state;
         _statusController.add(status);
       },
     );
@@ -33,7 +35,7 @@ class ZentrexVpnService {
 
   Future<bool> connect(String configUri, String profileName) async {
     if (!_isInitialized) await initialize();
-    
+
     try {
       // Forcefully stop any hanging core process first
       try {
@@ -41,14 +43,16 @@ class ZentrexVpnService {
       } catch (_) {}
 
       Map<String, dynamic> configMap;
-      
-      bool isJson = configUri.trim().startsWith('{') && configUri.trim().endsWith('}');
 
-      int randomSocksPort = 10000 + DateTime.now().millisecondsSinceEpoch % 40000;
+      bool isJson =
+          configUri.trim().startsWith('{') && configUri.trim().endsWith('}');
+
+      int randomSocksPort =
+          10000 + DateTime.now().millisecondsSinceEpoch % 40000;
 
       if (isJson) {
         configMap = jsonDecode(configUri);
-        
+
         // If the user imports a raw JSON, we must manually ensure DNS loop break
         // and scrub invalid fields since it doesn't pass through our generator.
         if (!configMap.containsKey('routing')) {
@@ -57,12 +61,12 @@ class ZentrexVpnService {
         if (configMap['routing']['rules'] == null) {
           configMap['routing']['rules'] = [];
         }
-        
+
         List<dynamic> rules = configMap['routing']['rules'];
-        rules.removeWhere((rule) => 
-          (rule['ip'] != null && rule['ip'].toString().contains('geoip')) ||
-          (rule['domain'] != null && rule['domain'].toString().contains('geosite'))
-        );
+        rules.removeWhere((rule) =>
+            (rule['ip'] != null && rule['ip'].toString().contains('geoip')) ||
+            (rule['domain'] != null &&
+                rule['domain'].toString().contains('geosite')));
 
         // Remove direct port 53 routing if we want DNS to go through the proxy!
         // We actually DO want DNS to go through the proxy once connected.
@@ -71,22 +75,24 @@ class ZentrexVpnService {
       } else {
         // Parse the raw VPN URL using our robust custom parser
         final params = VpnParameters.parse(configUri);
-        
+
         // PRE-RESOLVE THE DOMAIN TO AN IP ADDRESS BEFORE STARTING THE VPN!
         // This completely bypasses the DNS deadlock on SNI bug hosts (where generic DNS is blocked).
         // Since the VPN hasn't started yet, this uses the working ISP DNS.
         try {
           // Check if it's not already an IP
-          bool isIPv4 = RegExp(r'^([0-9]{1,3}\.){3}[0-9]{1,3}$').hasMatch(params.address);
+          bool isIPv4 =
+              RegExp(r'^([0-9]{1,3}\.){3}[0-9]{1,3}$').hasMatch(params.address);
           bool isIPv6 = params.address.contains(':');
           if (!isIPv4 && !isIPv6) {
             print("Pre-resolving proxy domain: ${params.address}");
-            
+
             // PRESERVE original address for SNI fallback if SNI is empty
             if (params.sni.isEmpty && params.host.isEmpty) {
-                params.sni = params.address;
+              params.sni = params.address;
             }
-            final addresses = await InternetAddress.lookup(params.address).timeout(const Duration(seconds: 5));
+            final addresses = await InternetAddress.lookup(params.address)
+                .timeout(const Duration(seconds: 5));
             if (addresses.isNotEmpty) {
               params.address = addresses.first.address;
               print("Pre-resolved to IP: ${params.address}");
@@ -108,6 +114,7 @@ class ZentrexVpnService {
       print("======================================");
 
       if (await v2ray.requestPermission()) {
+        await clearLogs();
         await v2ray.startV2Ray(
           remark: profileName,
           config: finalJsonConfig,
@@ -115,14 +122,14 @@ class ZentrexVpnService {
           blockedApps: null,
           // bypassSubnets causes VpnService builder to crash/ANR if formatted wrong
           // We will rely on geoip:private in the routing rules instead.
-          bypassSubnets: null, 
+          bypassSubnets: null,
         );
         return true;
       }
       return false;
     } catch (e) {
       print("VPN Connection Error: $e");
-      return false; 
+      return false;
     }
   }
 
@@ -135,6 +142,22 @@ class ZentrexVpnService {
       return await v2ray.getConnectedServerDelay();
     } catch (_) {
       return -1;
+    }
+  }
+
+  Future<List<String>> getLogs() async {
+    try {
+      return await v2ray.getLogs();
+    } catch (_) {
+      return [];
+    }
+  }
+
+  Future<bool> clearLogs() async {
+    try {
+      return await v2ray.clearLogs();
+    } catch (_) {
+      return false;
     }
   }
 

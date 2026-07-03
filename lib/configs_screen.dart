@@ -6,6 +6,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import 'config_manager.dart';
 import 'advanced_edit_screen.dart';
+import 'vpn_service.dart';
 
 class ConfigsScreen extends StatefulWidget {
   const ConfigsScreen({super.key});
@@ -26,6 +27,20 @@ class _ConfigsScreenState extends State<ConfigsScreen> {
     setState(() {});
   }
 
+  bool _canModifyConfig() {
+    if (ZentrexVpnService.instance.currentStatus != "DISCONNECTED") {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: const Color(0xFF131A2A),
+          content: Text('Please disconnect the VPN first.',
+              style: GoogleFonts.inter(color: Colors.redAccent)),
+        ),
+      );
+      return false;
+    }
+    return true;
+  }
+
   Future<void> _importFromClipboard() async {
     final ClipboardData? data = await Clipboard.getData(Clipboard.kTextPlain);
     if (data == null || data.text == null || data.text!.isEmpty) {
@@ -37,10 +52,14 @@ class _ConfigsScreenState extends State<ConfigsScreen> {
 
     final text = data.text!.trim();
     bool isJson = text.startsWith('{') && text.endsWith('}');
-    
-    if (!isJson && !text.startsWith('vless://') && !text.startsWith('vmess://') && !text.startsWith('trojan://')) {
+
+    if (!isJson &&
+        !text.startsWith('vless://') &&
+        !text.startsWith('vmess://') &&
+        !text.startsWith('trojan://')) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Invalid config URI or JSON in clipboard')),
+        const SnackBar(
+            content: Text('Invalid config URI or JSON in clipboard')),
       );
       return;
     }
@@ -81,27 +100,38 @@ class _ConfigsScreenState extends State<ConfigsScreen> {
       );
     }
   }
+
   void _deleteConfig(VpnConfig config) {
+    if (!_canModifyConfig()) return;
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: const Color(0xFF1E293B),
-        title: Text('Delete Config', style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.bold)),
-        content: Text('Are you sure you want to delete "${config.name}"?', style: GoogleFonts.inter(color: Colors.white70)),
+        title: Text('Delete Config',
+            style: GoogleFonts.outfit(
+                color: Colors.white, fontWeight: FontWeight.bold)),
+        content: Text('Are you sure you want to delete "${config.name}"?',
+            style: GoogleFonts.inter(color: Colors.white70)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: Text('Cancel', style: GoogleFonts.inter(color: Colors.cyanAccent)),
+            child: Text('Cancel',
+                style: GoogleFonts.inter(color: const Color(0xFF00E5FF))),
           ),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent, foregroundColor: Colors.white),
+            style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.redAccent,
+                foregroundColor: Colors.white),
             onPressed: () {
               Navigator.pop(context);
               _manager.removeConfig(config.id);
               _refresh();
-              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Deleted ${config.name}')));
+              ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Deleted ${config.name}')));
             },
-            child: Text('Delete', style: GoogleFonts.inter(fontWeight: FontWeight.bold)),
+            child: Text('Delete',
+                style: GoogleFonts.inter(fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -109,6 +139,8 @@ class _ConfigsScreenState extends State<ConfigsScreen> {
   }
 
   void _showEditDialog(VpnConfig config) async {
+    if (!_canModifyConfig()) return;
+
     final result = await Navigator.push(
       context,
       MaterialPageRoute(
@@ -121,14 +153,13 @@ class _ConfigsScreenState extends State<ConfigsScreen> {
     }
   }
 
-
   @override
   Widget build(BuildContext context) {
     final configs = _manager.configs;
     final activeConfig = _manager.activeConfig;
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0F172A),
+      backgroundColor: const Color(0xFF0A0E17),
       body: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -151,20 +182,24 @@ class _ConfigsScreenState extends State<ConfigsScreen> {
                     onTap: _importFromClipboard,
                     borderRadius: BorderRadius.circular(12),
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 10),
                       decoration: BoxDecoration(
-                        color: Colors.cyanAccent.withValues(alpha: 0.1),
+                        color: const Color(0xFF00E5FF).withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.cyanAccent.withValues(alpha: 0.3)),
+                        border: Border.all(
+                            color:
+                                const Color(0xFF00E5FF).withValues(alpha: 0.3)),
                       ),
                       child: Row(
                         children: [
-                          const Icon(Icons.paste_rounded, color: Colors.cyanAccent, size: 18),
+                          const Icon(Icons.paste_rounded,
+                              color: const Color(0xFF00E5FF), size: 18),
                           const SizedBox(width: 8),
                           Text(
                             'Import',
                             style: GoogleFonts.inter(
-                              color: Colors.cyanAccent,
+                              color: const Color(0xFF00E5FF),
                               fontWeight: FontWeight.w600,
                               fontSize: 14,
                             ),
@@ -182,7 +217,9 @@ class _ConfigsScreenState extends State<ConfigsScreen> {
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(Icons.inbox_rounded, size: 64, color: Colors.white.withValues(alpha: 0.2)),
+                          Icon(Icons.inbox_rounded,
+                              size: 64,
+                              color: Colors.white.withValues(alpha: 0.2)),
                           const SizedBox(height: 16),
                           Text(
                             'No configs saved yet',
@@ -195,7 +232,8 @@ class _ConfigsScreenState extends State<ConfigsScreen> {
                       ),
                     )
                   : ListView.builder(
-                      padding: const EdgeInsets.only(left: 20, right: 20, bottom: 100),
+                      padding: const EdgeInsets.only(
+                          left: 20, right: 20, bottom: 100),
                       itemCount: configs.length,
                       itemBuilder: (context, index) {
                         final config = configs[index];
@@ -212,14 +250,19 @@ class _ConfigsScreenState extends State<ConfigsScreen> {
                               borderRadius: BorderRadius.circular(20),
                             ),
                             alignment: Alignment.centerRight,
-                            child: const Icon(Icons.delete_outline, color: Colors.white),
+                            child: const Icon(Icons.delete_outline,
+                                color: Colors.white),
                           ),
+                          confirmDismiss: (direction) async {
+                            return _canModifyConfig();
+                          },
                           onDismissed: (_) {
                             _manager.removeConfig(config.id);
                             _refresh();
                           },
                           child: GestureDetector(
                             onTap: () {
+                              if (!_canModifyConfig()) return;
                               _manager.setActiveConfig(config.id);
                               _refresh();
                             },
@@ -227,12 +270,24 @@ class _ConfigsScreenState extends State<ConfigsScreen> {
                               margin: const EdgeInsets.only(bottom: 16),
                               padding: const EdgeInsets.all(16),
                               decoration: BoxDecoration(
-                                color: Colors.white.withValues(alpha: isActive ? 0.1 : 0.03),
+                                color: const Color(0xFF131A2A),
                                 borderRadius: BorderRadius.circular(20),
                                 border: Border.all(
-                                  color: isActive ? Colors.cyanAccent.withValues(alpha: 0.5) : Colors.white.withValues(alpha: 0.05),
-                                  width: 1.5,
+                                  color: isActive
+                                      ? const Color(0xFF00E5FF)
+                                      : Colors.white.withValues(alpha: 0.05),
+                                  width: isActive ? 1.5 : 1.0,
                                 ),
+                                boxShadow: isActive
+                                    ? [
+                                        BoxShadow(
+                                          color: const Color(0xFF00E5FF)
+                                              .withValues(alpha: 0.15),
+                                          blurRadius: 15,
+                                          spreadRadius: 2,
+                                        )
+                                      ]
+                                    : null,
                               ),
                               child: Row(
                                 children: [
@@ -240,19 +295,27 @@ class _ConfigsScreenState extends State<ConfigsScreen> {
                                     width: 44,
                                     height: 44,
                                     decoration: BoxDecoration(
-                                      color: isActive ? Colors.cyanAccent.withValues(alpha: 0.2) : Colors.white.withValues(alpha: 0.1),
+                                      color: isActive
+                                          ? Colors.cyanAccent
+                                              .withValues(alpha: 0.2)
+                                          : Colors.white.withValues(alpha: 0.1),
                                       shape: BoxShape.circle,
                                     ),
                                     child: Icon(
-                                      isActive ? Icons.check_circle_rounded : Icons.public_rounded,
-                                      color: isActive ? Colors.cyanAccent : Colors.white70,
+                                      isActive
+                                          ? Icons.check_circle_rounded
+                                          : Icons.public_rounded,
+                                      color: isActive
+                                          ? const Color(0xFF00E5FF)
+                                          : Colors.white38,
                                       size: 24,
                                     ),
                                   ),
                                   const SizedBox(width: 16),
                                   Expanded(
                                     child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       children: [
                                         Text(
                                           config.name,
@@ -268,10 +331,15 @@ class _ConfigsScreenState extends State<ConfigsScreen> {
                                         Row(
                                           children: [
                                             Container(
-                                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                      horizontal: 6,
+                                                      vertical: 2),
                                               decoration: BoxDecoration(
-                                                color: Colors.white.withValues(alpha: 0.1),
-                                                borderRadius: BorderRadius.circular(4),
+                                                color: Colors.white
+                                                    .withValues(alpha: 0.1),
+                                                borderRadius:
+                                                    BorderRadius.circular(4),
                                               ),
                                               child: Text(
                                                 config.protocol,
@@ -288,9 +356,13 @@ class _ConfigsScreenState extends State<ConfigsScreen> {
                                     ),
                                   ),
                                   PopupMenuButton<String>(
-                                    icon: Icon(Icons.more_vert_rounded, color: Colors.white.withValues(alpha: 0.5)),
+                                    icon: Icon(Icons.more_vert_rounded,
+                                        color: Colors.white
+                                            .withValues(alpha: 0.5)),
                                     color: const Color(0xFF1E293B),
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                    shape: RoundedRectangleBorder(
+                                        borderRadius:
+                                            BorderRadius.circular(12)),
                                     onSelected: (value) {
                                       if (value == 'edit') {
                                         _showEditDialog(config);
@@ -303,9 +375,13 @@ class _ConfigsScreenState extends State<ConfigsScreen> {
                                         value: 'edit',
                                         child: Row(
                                           children: [
-                                            const Icon(Icons.edit_rounded, color: Colors.cyanAccent, size: 18),
+                                            const Icon(Icons.edit_rounded,
+                                                color: const Color(0xFF00E5FF),
+                                                size: 18),
                                             const SizedBox(width: 12),
-                                            Text('Edit', style: GoogleFonts.inter(color: Colors.white)),
+                                            Text('Edit',
+                                                style: GoogleFonts.inter(
+                                                    color: Colors.white)),
                                           ],
                                         ),
                                       ),
@@ -313,9 +389,13 @@ class _ConfigsScreenState extends State<ConfigsScreen> {
                                         value: 'delete',
                                         child: Row(
                                           children: [
-                                            const Icon(Icons.delete_rounded, color: Colors.redAccent, size: 18),
+                                            const Icon(Icons.delete_rounded,
+                                                color: Colors.redAccent,
+                                                size: 18),
                                             const SizedBox(width: 12),
-                                            Text('Delete', style: GoogleFonts.inter(color: Colors.redAccent)),
+                                            Text('Delete',
+                                                style: GoogleFonts.inter(
+                                                    color: Colors.redAccent)),
                                           ],
                                         ),
                                       ),

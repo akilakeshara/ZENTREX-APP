@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-import 'splash_screen.dart';
+import 'main_layout.dart';
+import 'config_manager.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
+  ConfigManager.instance.init(); // Initialize asynchronously
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
@@ -28,7 +30,7 @@ class ZentrexApp extends StatelessWidget {
         textTheme: GoogleFonts.interTextTheme(ThemeData.dark().textTheme),
         useMaterial3: true,
       ),
-      home: const SplashScreen(),
+      home: const MainLayout(),
     );
   }
 }
