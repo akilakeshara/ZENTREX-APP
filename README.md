@@ -16,6 +16,17 @@
 ## 🚀 Overview
 **ZENTREX** is a highly optimized, beautifully designed VPN and Network Analytics application built with Flutter. Utilizing the power of the `flutter_v2ray_client`, ZENTREX delivers top-tier proxy and VPN capabilities combined with stunning, real-time network analytics.
 
+## 📱 Screenshots
+<div align="center">
+  <img src="screenshots/home.png" alt="Home Screen" width="200"/>
+  &nbsp;&nbsp;&nbsp;&nbsp;
+  <img src="screenshots/configs.png" alt="Configs Screen" width="200"/>
+  <br/><br/>
+  <img src="screenshots/logs.png" alt="Logs Screen" width="200"/>
+  &nbsp;&nbsp;&nbsp;&nbsp;
+  <img src="screenshots/edit.png" alt="Edit Config Screen" width="200"/>
+</div>
+
 ## ✨ Features
 - 🛡️ **Advanced VPN Core**: Powered by Xray/V2Ray protocols for secure, untraceable, and fast connections.
 - 📊 **Real-time Analytics**: Built-in interactive charts (using `fl_chart`) to monitor upload/download speeds and network health.
