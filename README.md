@@ -19,9 +19,12 @@
 ## ✨ Features
 - 🛡️ **Advanced VPN Core**: Powered by Xray/V2Ray protocols for secure, untraceable, and fast connections.
 - 📊 **Real-time Analytics**: Built-in interactive charts (using `fl_chart`) to monitor upload/download speeds and network health.
+- 📜 **Live System Logs**: Real-time V2Ray logging with syntax highlighting, search filtering, and smart auto-stop on connection success.
 - ⚙️ **Config Management**: Seamlessly add, edit, and manage multiple V2Ray configurations.
+- 🔒 **Safe Editing**: Built-in protection against modifying or deleting configs while an active VPN connection is established.
 - 🎛️ **Advanced Editor**: Dive deep into proxy settings with the Advanced Edit Screen for power users.
 - 🎨 **Modern UI/UX**: Sleek, dark-mode native design optimized for readability and ease of use.
+- ⚡ **Instant Launch**: Highly optimized startup sequence bypassing loading screens for a zero-latency launch.
 - 💾 **Local Storage**: Securely save configurations locally using `shared_preferences`.
 
 

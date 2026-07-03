@@ -13,42 +13,52 @@ class DashboardScreen extends StatefulWidget {
   State<DashboardScreen> createState() => _DashboardScreenState();
 }
 
-class _DashboardScreenState extends State<DashboardScreen> {
+class _DashboardScreenState extends State<DashboardScreen>
+    with SingleTickerProviderStateMixin {
   final ZentrexVpnService _vpnService = ZentrexVpnService.instance;
+
   bool _isConnected = false;
   bool _isConnecting = false;
-  bool _isPinging = false;
   bool _hasMeasuredInitialPing = false;
-  int _ping = 0;
-  
-  // Traffic & Memory Stats
-  int _uploadBytes = 0;
-  int _downloadBytes = 0;
-  String _sessionDuration = '00:00:00';
-  int _appMemBytes = 0;
-  int _deviceTotalMemBytes = 0;
-  int _deviceAvailMemBytes = 0;
-  
+
+  // High-frequency updating stats
+  final ValueNotifier<int> _ping = ValueNotifier<int>(0);
+  final ValueNotifier<bool> _isPinging = ValueNotifier<bool>(false);
+  final ValueNotifier<int> _uploadBytes = ValueNotifier<int>(0);
+  final ValueNotifier<int> _downloadBytes = ValueNotifier<int>(0);
+  final ValueNotifier<String> _sessionDuration =
+      ValueNotifier<String>('00:00:00');
+  final ValueNotifier<int> _appMemBytes = ValueNotifier<int>(0);
+
   Timer? _memTimer;
+  StreamSubscription? _vpnStatusSub;
   static const _memoryChannel = MethodChannel('com.zentrex/memory');
+
+  // Animation for the connect button pulsing
+  late AnimationController _pulseController;
+  late Animation<double> _pulseAnimation;
 
   @override
   void initState() {
     super.initState();
+    _pulseController = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 1500));
+    _pulseAnimation = Tween<double>(begin: 1.0, end: 1.05).animate(
+      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
+    );
+
     _initVpn();
     _fetchMemory();
-    _memTimer = Timer.periodic(const Duration(seconds: 3), (_) => _fetchMemory());
+    _memTimer =
+        Timer.periodic(const Duration(seconds: 3), (_) => _fetchMemory());
   }
 
   Future<void> _fetchMemory() async {
     try {
-      final Map<Object?, Object?> result = await _memoryChannel.invokeMethod('getMemoryInfo');
+      final Map<Object?, Object?> result =
+          await _memoryChannel.invokeMethod('getMemoryInfo');
       if (mounted) {
-        setState(() {
-          _deviceTotalMemBytes = (result['deviceTotalMem'] as num?)?.toInt() ?? 0;
-          _deviceAvailMemBytes = (result['deviceAvailMem'] as num?)?.toInt() ?? 0;
-          _appMemBytes = (result['appTotalMem'] as num?)?.toInt() ?? 0;
-        });
+        _appMemBytes.value = (result['appTotalMem'] as num?)?.toInt() ?? 0;
       }
     } catch (_) {}
   }
@@ -56,61 +66,89 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   void dispose() {
     _memTimer?.cancel();
+    _vpnStatusSub?.cancel();
+    _pulseController.dispose();
+
+    _ping.dispose();
+    _isPinging.dispose();
+    _uploadBytes.dispose();
+    _downloadBytes.dispose();
+    _sessionDuration.dispose();
+    _appMemBytes.dispose();
     super.dispose();
   }
 
   Future<void> _initVpn() async {
     await _vpnService.initialize();
-    _vpnService.v2rayStatusStream.listen((status) {
+    _vpnStatusSub = _vpnService.v2rayStatusStream.listen((status) {
       if (!mounted) return;
-      setState(() {
-        _isConnected = status.state == "CONNECTED";
-        if (status.state == "DISCONNECTED") {
-          _isConnecting = false;
-        }
 
-        _uploadBytes = status.upload;
-        _downloadBytes = status.download;
-        _sessionDuration = status.duration;
+      bool newIsConnected = status.state == "CONNECTED";
+      bool newIsConnecting =
+          status.state == "DISCONNECTED" ? false : _isConnecting;
 
-        if (_isConnected) {
-          _isConnecting = false;
-          // Measure ping once on connect, user can tap to refresh manually
-          if (!_hasMeasuredInitialPing) {
-            _hasMeasuredInitialPing = true;
-            _measurePing();
-          }
-        } else {
-          _ping = 0;
-          _hasMeasuredInitialPing = false;
-        }
-      });
+      // Handle button pulsing
+      if (newIsConnected || newIsConnecting) {
+        if (!_pulseController.isAnimating)
+          _pulseController.repeat(reverse: true);
+      } else {
+        _pulseController.stop();
+        _pulseController.value = 1.0;
+      }
+
+      if (_isConnected != newIsConnected || _isConnecting != newIsConnecting) {
+        setState(() {
+          _isConnected = newIsConnected;
+          _isConnecting = newIsConnecting;
+        });
+      }
+
+      _uploadBytes.value = status.upload;
+      _downloadBytes.value = status.download;
+      _sessionDuration.value = status.duration;
+
+      if (newIsConnected && !_hasMeasuredInitialPing) {
+        _hasMeasuredInitialPing = true;
+        _measurePing();
+      } else if (!newIsConnected) {
+        _ping.value = 0;
+        _hasMeasuredInitialPing = false;
+      }
     });
   }
 
   Future<void> _toggleConnection() async {
     final activeConfig = ConfigManager.instance.activeConfig;
-    
+
     if (_isConnected) {
       await _vpnService.disconnect();
     } else {
       if (activeConfig == null) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Please select a config from the Configs page!')),
+          SnackBar(
+            backgroundColor: const Color(0xFF131A2A),
+            content: Text('Please select a config from the Configs page!',
+                style: GoogleFonts.inter(color: const Color(0xFF00E5FF))),
+          ),
         );
         return;
       }
       setState(() {
         _isConnecting = true;
       });
-      bool success = await _vpnService.connect(activeConfig.url, activeConfig.name);
+      bool success =
+          await _vpnService.connect(activeConfig.url, activeConfig.name);
       if (!success) {
-        setState(() {
-          _isConnecting = false;
-        });
         if (mounted) {
+          setState(() {
+            _isConnecting = false;
+          });
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Failed to connect. Check configuration.')),
+            SnackBar(
+              backgroundColor: const Color(0xFF131A2A),
+              content: Text('Failed to connect. Check configuration.',
+                  style: GoogleFonts.inter(color: Colors.redAccent)),
+            ),
           );
         }
       }
@@ -118,18 +156,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Future<void> _measurePing() async {
-    if (!_isConnected || _isPinging) return;
-    if (mounted) {
-      setState(() {
-        _isPinging = true;
-      });
-    }
+    if (!_isConnected || _isPinging.value) return;
+    _isPinging.value = true;
     int ping = await _vpnService.getPing();
     if (mounted) {
-      setState(() {
-        _ping = ping;
-        _isPinging = false;
-      });
+      _ping.value = ping;
+      _isPinging.value = false;
     }
   }
 
@@ -142,20 +174,26 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
+  String _formatBytes(int bytes) {
+    if (bytes < 1024) return '$bytes B';
+    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
+    if (bytes < 1024 * 1024 * 1024)
+      return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+    return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(2)} GB';
+  }
+
   @override
   Widget build(BuildContext context) {
-    final activeConfig = ConfigManager.instance.activeConfig;
-
     return Scaffold(
-      backgroundColor: const Color(0xFF0F172A),
+      backgroundColor: const Color(0xFF0A0E17), // Deep Space Black
       body: SafeArea(
         child: Column(
           children: [
             // Header
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
+              child: Column(
                 children: [
                   Text(
                     'ZENTREX',
@@ -166,12 +204,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       letterSpacing: 2.0,
                     ),
                   ),
+                  const SizedBox(height: 4),
                   Text(
                     'Advanced Network',
                     style: GoogleFonts.inter(
-                      fontSize: 14,
-                      color: Colors.cyanAccent,
+                      fontSize: 12,
+                      color: const Color(0xFF00E5FF),
                       fontWeight: FontWeight.w500,
+                      letterSpacing: 1.2,
                     ),
                   ),
                 ],
@@ -179,123 +219,217 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
 
             Expanded(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24.0),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    // Connect Button
-                    GestureDetector(
-                      onTap: _toggleConnection,
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 300),
-                        width: 140,
-                        height: 140,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          gradient: LinearGradient(
-                            colors: _isConnected
-                                ? [Colors.redAccent, Colors.deepOrange]
-                                : [Colors.cyanAccent, Colors.blueAccent],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: (_isConnected ? Colors.redAccent : Colors.cyanAccent)
-                                  .withValues(alpha: 0.4),
-                              blurRadius: 30,
-                              spreadRadius: 5,
-                            )
-                          ],
-                        ),
-                        child: Center(
-                          child: Icon(
-                            _isConnected ? Icons.power_settings_new : Icons.rocket_launch_rounded,
-                            size: 56,
-                            color: _isConnected ? Colors.white : Colors.black87,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    
-                    // Status Text
-                    Text(
-                      _isConnected
-                          ? 'CONNECTED'
-                          : (_isConnecting ? 'CONNECTING...' : 'DISCONNECTED'),
-                      style: GoogleFonts.inter(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
-                        letterSpacing: 2.0,
-                        color: _isConnected ? Colors.greenAccent : Colors.white54,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      activeConfig?.name ?? 'No Config Selected',
-                      style: GoogleFonts.outfit(
-                        fontSize: 22,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.white,
-                      ),
-                      textAlign: TextAlign.center,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    if (_isConnected) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        'Session Duration: $_sessionDuration',
-                        style: GoogleFonts.inter(
-                          color: Colors.white54,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
+              child: ListenableBuilder(
+                  listenable: ConfigManager.instance,
+                  builder: (context, _) {
+                    final activeConfig = ConfigManager.instance.activeConfig;
 
-                    const SizedBox(height: 40),
-
-                    // Unified Metrics Hub
-                    Container(
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.03),
-                        borderRadius: BorderRadius.circular(24),
-                        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
-                      ),
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 24.0),
                       child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          _buildMetricRow(
-                            Icons.public, 'Address', _extractHost(activeConfig?.url ?? ''), Colors.blueAccent,
-                            Icons.security, 'Protocol', activeConfig?.protocol ?? 'Unknown', Colors.pinkAccent,
-                          ),
-                          Divider(color: Colors.white.withValues(alpha: 0.05), height: 1),
-                          _buildMetricRow(
-                            Icons.arrow_downward_rounded, 'Download', _formatBytes(_downloadBytes), Colors.cyanAccent,
-                            Icons.arrow_upward_rounded, 'Upload', _formatBytes(_uploadBytes), Colors.purpleAccent,
-                          ),
-                          Divider(color: Colors.white.withValues(alpha: 0.05), height: 1),
-                          InkWell(
-                            onTap: _measurePing,
-                            borderRadius: const BorderRadius.only(
-                              bottomLeft: Radius.circular(24),
-                              bottomRight: Radius.circular(24),
+                          // Connect Button with RepaintBoundary and ScaleTransition
+                          RepaintBoundary(
+                            child: GestureDetector(
+                              onTap: _toggleConnection,
+                              child: ScaleTransition(
+                                scale: _pulseAnimation,
+                                child: AnimatedContainer(
+                                  duration: const Duration(milliseconds: 300),
+                                  width: 140,
+                                  height: 140,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    gradient: LinearGradient(
+                                      colors: _isConnected
+                                          ? [
+                                              const Color(0xFF00E676),
+                                              const Color(0xFF1DE9B6)
+                                            ] // Emerald glow
+                                          : [
+                                              const Color(0xFF00E5FF),
+                                              const Color(0xFF7000FF)
+                                            ], // Cyberpunk Cyan/Purple
+                                      begin: Alignment.topLeft,
+                                      end: Alignment.bottomRight,
+                                    ),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: (_isConnected
+                                                ? const Color(0xFF00E676)
+                                                : const Color(0xFF00E5FF))
+                                            .withValues(
+                                                alpha:
+                                                    _isConnecting ? 0.6 : 0.4),
+                                        blurRadius: _isConnecting ? 40 : 30,
+                                        spreadRadius: 5,
+                                      )
+                                    ],
+                                  ),
+                                  child: Center(
+                                    child: Icon(
+                                      _isConnected
+                                          ? Icons.power_settings_new
+                                          : Icons.rocket_launch_rounded,
+                                      size: 56,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ),
+                              ),
                             ),
-                            child: _buildMetricRow(
-                              Icons.network_ping, 'Ping', 
-                              !_isConnected ? 'Offline' : (_isPinging ? 'Wait..' : (_ping > 0 ? '${_ping}ms' : 'Tap')),
-                              _isConnected && _ping > 0 ? Colors.greenAccent : Colors.white70,
-                              Icons.memory, 'App RAM', _formatBytes(_appMemBytes), Colors.orangeAccent,
+                          ),
+                          const SizedBox(height: 24),
+
+                          // Status Text
+                          Text(
+                            _isConnected
+                                ? 'CONNECTED'
+                                : (_isConnecting
+                                    ? 'CONNECTING...'
+                                    : 'DISCONNECTED'),
+                            style: GoogleFonts.inter(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                              letterSpacing: 2.0,
+                              color: _isConnected
+                                  ? const Color(0xFF00E676)
+                                  : Colors.white54,
                             ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            activeConfig?.name ?? 'No Config Selected',
+                            style: GoogleFonts.outfit(
+                              fontSize: 22,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white,
+                            ),
+                            textAlign: TextAlign.center,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+
+                          // Reserve fixed height space for session duration to prevent layout jumping
+                          const SizedBox(height: 4),
+                          SizedBox(
+                            height: 20,
+                            child: _isConnected
+                                ? ValueListenableBuilder<String>(
+                                    valueListenable: _sessionDuration,
+                                    builder: (context, duration, _) {
+                                      return Text(
+                                        'Session Duration: $duration',
+                                        style: GoogleFonts.inter(
+                                          color: Colors.white54,
+                                          fontSize: 12,
+                                        ),
+                                      );
+                                    },
+                                  )
+                                : const SizedBox.shrink(),
+                          ),
+
+                          const SizedBox(height: 36),
+
+                          // Metrics Grid
+                          Row(
+                            children: [
+                              Expanded(
+                                child: _buildGridCard(
+                                    Icons.public_rounded,
+                                    'Address',
+                                    _extractHost(activeConfig?.url ?? ''),
+                                    Colors.blueAccent),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: _buildGridCard(
+                                    Icons.security_rounded,
+                                    'Protocol',
+                                    activeConfig?.protocol ?? 'Unknown',
+                                    Colors.pinkAccent),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: ValueListenableBuilder<int>(
+                                    valueListenable: _downloadBytes,
+                                    builder: (context, dl, _) {
+                                      return _buildGridCard(
+                                          Icons.arrow_downward_rounded,
+                                          'Download',
+                                          _formatBytes(dl),
+                                          const Color(0xFF00E5FF));
+                                    }),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: ValueListenableBuilder<int>(
+                                    valueListenable: _uploadBytes,
+                                    builder: (context, ul, _) {
+                                      return _buildGridCard(
+                                          Icons.arrow_upward_rounded,
+                                          'Upload',
+                                          _formatBytes(ul),
+                                          const Color(0xFF7000FF));
+                                    }),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: InkWell(
+                                  onTap: _measurePing,
+                                  borderRadius: BorderRadius.circular(20),
+                                  child: ValueListenableBuilder<bool>(
+                                      valueListenable: _isPinging,
+                                      builder: (context, isPinging, _) {
+                                        return ValueListenableBuilder<int>(
+                                            valueListenable: _ping,
+                                            builder: (context, pingValue, _) {
+                                              return _buildGridCard(
+                                                Icons.network_ping_rounded,
+                                                'Ping',
+                                                !_isConnected
+                                                    ? 'Offline'
+                                                    : (isPinging
+                                                        ? 'Wait..'
+                                                        : (pingValue > 0
+                                                            ? '${pingValue}ms'
+                                                            : 'Tap')),
+                                                _isConnected && pingValue > 0
+                                                    ? const Color(0xFF00E676)
+                                                    : Colors.white54,
+                                              );
+                                            });
+                                      }),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: ValueListenableBuilder<int>(
+                                    valueListenable: _appMemBytes,
+                                    builder: (context, memValue, _) {
+                                      return _buildGridCard(
+                                          Icons.memory_rounded,
+                                          'App RAM',
+                                          _formatBytes(memValue),
+                                          Colors.orangeAccent);
+                                    }),
+                              ),
+                            ],
                           ),
                         ],
                       ),
-                    ),
-                  ],
-                ),
-              ),
+                    );
+                  }),
             ),
           ],
         ),
@@ -303,63 +437,45 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  String _formatBytes(int bytes) {
-    if (bytes < 1024) return '$bytes B';
-    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
-    if (bytes < 1024 * 1024 * 1024) return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
-    return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(2)} GB';
-  }
-
-  Widget _buildMetricRow(IconData icon1, String label1, String val1, Color color1,
-                         IconData icon2, String label2, String val2, Color color2) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-      child: Row(
-        children: [
-          Expanded(child: _buildMetricItem(icon1, label1, val1, color1)),
-          Container(
-            height: 40,
-            width: 1,
-            color: Colors.white.withValues(alpha: 0.05),
-          ),
-          const SizedBox(width: 20),
-          Expanded(child: _buildMetricItem(icon2, label2, val2, color2)),
-        ],
+  Widget _buildGridCard(
+      IconData icon, String label, String value, Color iconColor) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF131A2A), // Elevated dark blue
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
       ),
-    );
-  }
-
-  Widget _buildMetricItem(IconData icon, String label, String value, Color color) {
-    return Row(
-      children: [
-        Icon(icon, color: color, size: 22),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             children: [
+              Icon(icon, color: iconColor, size: 18),
+              const SizedBox(width: 8),
               Text(
                 label,
                 style: GoogleFonts.inter(
                   color: Colors.white54,
-                  fontSize: 11,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
                 ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                value,
-                style: GoogleFonts.inter(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 13,
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
               ),
             ],
           ),
-        ),
-      ],
+          const SizedBox(height: 12),
+          Text(
+            value,
+            style: GoogleFonts.outfit(
+              color: Colors.white,
+              fontWeight: FontWeight.w600,
+              fontSize: 16,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
+      ),
     );
   }
 }

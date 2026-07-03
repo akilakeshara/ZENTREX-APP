@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter/foundation.dart';
 
 class VpnConfig {
   final String id;
@@ -35,7 +36,7 @@ class VpnConfig {
   }
 }
 
-class ConfigManager {
+class ConfigManager extends ChangeNotifier {
   static const String _configsKey = 'zentrex_saved_configs';
   static const String _activeConfigKey = 'zentrex_active_config_id';
 
@@ -47,7 +48,7 @@ class ConfigManager {
   String? _activeConfigId;
 
   List<VpnConfig> get configs => List.unmodifiable(_configs);
-  
+
   VpnConfig? get activeConfig {
     if (_activeConfigId == null) return null;
     try {
@@ -59,7 +60,7 @@ class ConfigManager {
 
   Future<void> init() async {
     final prefs = await SharedPreferences.getInstance();
-    
+
     // Load configs
     final String? configsJson = prefs.getString(_configsKey);
     if (configsJson != null) {
@@ -74,6 +75,7 @@ class ConfigManager {
 
     // Load active config ID
     _activeConfigId = prefs.getString(_activeConfigKey);
+    notifyListeners();
   }
 
   Future<void> _saveToStorage() async {
@@ -85,11 +87,12 @@ class ConfigManager {
   Future<void> addConfig(VpnConfig config) async {
     _configs.add(config);
     await _saveToStorage();
-    
+
     // Auto-select if it's the only one
     if (_configs.length == 1) {
       await setActiveConfig(config.id);
     }
+    notifyListeners();
   }
 
   Future<void> removeConfig(String id) async {
@@ -98,6 +101,7 @@ class ConfigManager {
       await setActiveConfig(null);
     }
     await _saveToStorage();
+    notifyListeners();
   }
 
   Future<void> updateConfig(VpnConfig updatedConfig) async {
@@ -105,6 +109,7 @@ class ConfigManager {
     if (index != -1) {
       _configs[index] = updatedConfig;
       await _saveToStorage();
+      notifyListeners();
     }
   }
 
@@ -116,5 +121,6 @@ class ConfigManager {
     } else {
       await prefs.remove(_activeConfigKey);
     }
+    notifyListeners();
   }
 }
