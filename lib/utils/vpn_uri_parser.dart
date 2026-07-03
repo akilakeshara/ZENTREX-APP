@@ -339,13 +339,16 @@ class VpnParameters {
 
     // Security specifics
     if (security == 'tls') {
-      List<String> alpnList = alpn.isNotEmpty ? alpn.split(',') : ["h2", "http/1.1"];
       streamSettings['tlsSettings'] = {
         "allowInsecure": allowInsecure == '1' || allowInsecure == 'true' || insecure == '1' || insecure == 'true',
         "serverName": sni.isNotEmpty ? sni : (host.isNotEmpty ? host : address),
-        "alpn": alpnList,
-        "fingerprint": fingerprint.isNotEmpty ? fingerprint : "chrome"
       };
+      if (alpn.isNotEmpty) {
+        streamSettings['tlsSettings']['alpn'] = alpn.split(',');
+      }
+      if (fingerprint.isNotEmpty) {
+        streamSettings['tlsSettings']['fingerprint'] = fingerprint;
+      }
     } else if (security == 'reality') {
       streamSettings['realitySettings'] = {
         "show": false,

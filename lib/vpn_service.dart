@@ -81,6 +81,11 @@ class ZentrexVpnService {
           bool isIPv6 = params.address.contains(':');
           if (!isIPv4 && !isIPv6) {
             print("Pre-resolving proxy domain: ${params.address}");
+            
+            // PRESERVE original address for SNI fallback if SNI is empty
+            if (params.sni.isEmpty && params.host.isEmpty) {
+                params.sni = params.address;
+            }
             final addresses = await InternetAddress.lookup(params.address).timeout(const Duration(seconds: 5));
             if (addresses.isNotEmpty) {
               params.address = addresses.first.address;
