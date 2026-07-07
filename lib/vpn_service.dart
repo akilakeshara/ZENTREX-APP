@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:developer';
 import 'dart:io';
 import 'package:flutter_v2ray_client/flutter_v2ray.dart';
 import 'package:zentrex/utils/vpn_uri_parser.dart';
@@ -7,7 +8,6 @@ import 'package:zentrex/utils/vpn_uri_parser.dart';
 class ZentrexVpnService {
   late final V2ray v2ray;
   bool _isInitialized = false;
-  String? _lastConfigJson;
   String currentStatus = "DISCONNECTED";
   final StreamController<V2RayStatus> _statusController =
       StreamController<V2RayStatus>.broadcast();
@@ -85,7 +85,7 @@ class ZentrexVpnService {
               RegExp(r'^([0-9]{1,3}\.){3}[0-9]{1,3}$').hasMatch(params.address);
           bool isIPv6 = params.address.contains(':');
           if (!isIPv4 && !isIPv6) {
-            print("Pre-resolving proxy domain: ${params.address}");
+            log("Pre-resolving proxy domain: ${params.address}");
 
             // PRESERVE original address for SNI fallback if SNI is empty
             if (params.sni.isEmpty && params.host.isEmpty) {
@@ -95,11 +95,11 @@ class ZentrexVpnService {
                 .timeout(const Duration(seconds: 5));
             if (addresses.isNotEmpty) {
               params.address = addresses.first.address;
-              print("Pre-resolved to IP: ${params.address}");
+              log("Pre-resolved to IP: ${params.address}");
             }
           }
         } catch (e) {
-          print("Failed to pre-resolve domain: $e");
+          log("Failed to pre-resolve domain: $e");
         }
 
         String rawJson = params.toXrayJson(randomSocksPort);
@@ -107,11 +107,10 @@ class ZentrexVpnService {
       }
 
       String finalJsonConfig = jsonEncode(configMap);
-      _lastConfigJson = finalJsonConfig;
 
-      print("========= FINAL V2RAY CONFIG =========");
-      print(finalJsonConfig);
-      print("======================================");
+      log("========= FINAL V2RAY CONFIG =========");
+      log(finalJsonConfig);
+      log("======================================");
 
       if (await v2ray.requestPermission()) {
         await clearLogs();
@@ -128,7 +127,7 @@ class ZentrexVpnService {
       }
       return false;
     } catch (e) {
-      print("VPN Connection Error: $e");
+      log("VPN Connection Error: $e");
       return false;
     }
   }
@@ -141,6 +140,30 @@ class ZentrexVpnService {
     try {
       return await v2ray.getConnectedServerDelay();
     } catch (_) {
+      return -1;
+    }
+  }
+
+  Future<int> getRealPing(String configUri) async {
+    try {
+      if (!_isInitialized) await initialize();
+      
+      Map<String, dynamic> configMap;
+      bool isJson = configUri.trim().startsWith('{') && configUri.trim().endsWith('}');
+      int randomSocksPort = 10000 + DateTime.now().millisecondsSinceEpoch % 40000;
+
+      if (isJson) {
+        configMap = jsonDecode(configUri);
+      } else {
+        final params = VpnParameters.parse(configUri);
+        String rawJson = params.toXrayJson(randomSocksPort);
+        configMap = jsonDecode(rawJson);
+      }
+
+      String finalJsonConfig = jsonEncode(configMap);
+      return await v2ray.getServerDelay(config: finalJsonConfig);
+    } catch (e) {
+      log("Real ping error: $e");
       return -1;
     }
   }

@@ -198,7 +198,7 @@ class _AdvancedEditScreenState extends State<AdvancedEditScreen> {
                 isExpanded: true,
                 dropdownColor: const Color(0xFF131A2A),
                 icon: const Icon(Icons.unfold_more_rounded,
-                    color: const Color(0xFF00E5FF)),
+                    color: Color(0xFF00E5FF)),
                 items: items.map((String item) {
                   return DropdownMenuItem<String>(
                     value: item,
@@ -245,7 +245,7 @@ class _AdvancedEditScreenState extends State<AdvancedEditScreen> {
                 width: 20,
                 height: 20,
                 child: CircularProgressIndicator(
-                    color: const Color(0xFF00E5FF), strokeWidth: 2),
+                    color: Color(0xFF00E5FF), strokeWidth: 2),
               ),
             )
           else
@@ -292,7 +292,7 @@ class _AdvancedEditScreenState extends State<AdvancedEditScreen> {
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
                         borderSide: const BorderSide(
-                            color: const Color(0xFF00E5FF), width: 1.5),
+                            color: Color(0xFF00E5FF), width: 1.5),
                       ),
                     ),
                   ),

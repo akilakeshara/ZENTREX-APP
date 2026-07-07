@@ -4,10 +4,14 @@ import 'package:google_fonts/google_fonts.dart';
 
 import 'main_layout.dart';
 import 'config_manager.dart';
+import 'settings_manager.dart';
+import 'data_usage_manager.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
   ConfigManager.instance.init(); // Initialize asynchronously
+  SettingsManager.instance.init();
+  DataUsageManager.instance.init();
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,

@@ -89,8 +89,9 @@ class _DashboardScreenState extends State<DashboardScreen>
 
       // Handle button pulsing
       if (newIsConnected || newIsConnecting) {
-        if (!_pulseController.isAnimating)
+        if (!_pulseController.isAnimating) {
           _pulseController.repeat(reverse: true);
+        }
       } else {
         _pulseController.stop();
         _pulseController.value = 1.0;
@@ -177,8 +178,9 @@ class _DashboardScreenState extends State<DashboardScreen>
   String _formatBytes(int bytes) {
     if (bytes < 1024) return '$bytes B';
     if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
-    if (bytes < 1024 * 1024 * 1024)
+    if (bytes < 1024 * 1024 * 1024) {
       return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+    }
     return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(2)} GB';
   }
 

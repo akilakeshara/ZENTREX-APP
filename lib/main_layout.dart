@@ -4,7 +4,9 @@ import 'package:google_fonts/google_fonts.dart';
 
 import 'dashboard_screen.dart';
 import 'configs_screen.dart';
+import 'data_usage_screen.dart';
 import 'logs_screen.dart';
+import 'settings_screen.dart';
 
 class MainLayout extends StatefulWidget {
   const MainLayout({super.key});
@@ -19,12 +21,9 @@ class _MainLayoutState extends State<MainLayout> {
   final List<Widget> _pages = const [
     DashboardScreen(),
     ConfigsScreen(),
-    const LogsScreen(),
-    Scaffold(
-        backgroundColor: Color(0xFF0A0E17),
-        body: Center(
-            child: Text('Settings (Coming Soon)',
-                style: TextStyle(color: Colors.white)))),
+    DataUsageScreen(),
+    LogsScreen(),
+    SettingsScreen(),
   ];
 
   @override
@@ -92,6 +91,10 @@ class _MainLayoutState extends State<MainLayout> {
                         BottomNavigationBarItem(
                           icon: Icon(Icons.list_alt_rounded),
                           label: 'Configs',
+                        ),
+                        BottomNavigationBarItem(
+                          icon: Icon(Icons.bar_chart_rounded),
+                          label: 'Stats',
                         ),
                         BottomNavigationBarItem(
                           icon: Icon(Icons.terminal_rounded),

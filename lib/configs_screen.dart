@@ -1,4 +1,4 @@
-import 'dart:ui';
+
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -7,6 +7,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'config_manager.dart';
 import 'advanced_edit_screen.dart';
 import 'vpn_service.dart';
+import 'utils/ping_tester.dart';
+import 'utils/vpn_uri_parser.dart';
 
 class ConfigsScreen extends StatefulWidget {
   const ConfigsScreen({super.key});
@@ -17,14 +19,61 @@ class ConfigsScreen extends StatefulWidget {
 
 class _ConfigsScreenState extends State<ConfigsScreen> {
   final ConfigManager _manager = ConfigManager.instance;
+  
+  Map<String, int> _pingResults = {};
+  bool _isTestingPings = false;
+
+  Future<void> _testAllPings() async {
+    if (!_canModifyConfig()) return;
+    if (_isTestingPings || _manager.configs.isEmpty) return;
+    setState(() {
+      _isTestingPings = true;
+      _pingResults.clear();
+    });
+
+    final configs = _manager.configs;
+    for (var i = 0; i < configs.length; i += 3) {
+      final batch = configs.skip(i).take(3);
+      await Future.wait(batch.map((config) async {
+        try {
+          final ping = await ZentrexVpnService.instance.getRealPing(config.url);
+          if (mounted) {
+            setState(() {
+              _pingResults[config.id] = ping;
+            });
+          }
+        } catch (e) {
+          if (mounted) {
+            setState(() {
+              _pingResults[config.id] = -1;
+            });
+          }
+        }
+      }));
+    }
+
+    if (mounted) {
+      await _manager.sortConfigsByPing(_pingResults);
+      setState(() {
+        _isTestingPings = false;
+      });
+    }
+  }
 
   @override
   void initState() {
     super.initState();
+    _manager.addListener(_refresh);
+  }
+
+  @override
+  void dispose() {
+    _manager.removeListener(_refresh);
+    super.dispose();
   }
 
   void _refresh() {
-    setState(() {});
+    if (mounted) setState(() {});
   }
 
   bool _canModifyConfig() {
@@ -43,6 +92,7 @@ class _ConfigsScreenState extends State<ConfigsScreen> {
 
   Future<void> _importFromClipboard() async {
     final ClipboardData? data = await Clipboard.getData(Clipboard.kTextPlain);
+    if (!mounted) return;
     if (data == null || data.text == null || data.text!.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Clipboard is empty')),
@@ -57,6 +107,7 @@ class _ConfigsScreenState extends State<ConfigsScreen> {
         !text.startsWith('vless://') &&
         !text.startsWith('vmess://') &&
         !text.startsWith('trojan://')) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
             content: Text('Invalid config URI or JSON in clipboard')),
@@ -91,10 +142,12 @@ class _ConfigsScreenState extends State<ConfigsScreen> {
       await _manager.addConfig(newConfig);
       _refresh();
 
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Imported $name')),
       );
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Failed to parse config')),
       );
@@ -153,6 +206,33 @@ class _ConfigsScreenState extends State<ConfigsScreen> {
     }
   }
 
+  Widget _buildPingBadge(int ping) {
+    Color color;
+    String text;
+    if (ping == -1) {
+      color = Colors.redAccent;
+      text = 'Timeout';
+    } else if (ping < 150) {
+      color = const Color(0xFF00E676);
+      text = '${ping}ms';
+    } else if (ping < 300) {
+      color = Colors.orangeAccent;
+      text = '${ping}ms';
+    } else {
+      color = Colors.redAccent;
+      text = '${ping}ms';
+    }
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(Icons.flash_on_rounded, color: color, size: 12),
+        const SizedBox(width: 2),
+        Text(text, style: GoogleFonts.inter(color: color, fontSize: 10, fontWeight: FontWeight.bold)),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final configs = _manager.configs;
@@ -160,6 +240,34 @@ class _ConfigsScreenState extends State<ConfigsScreen> {
 
     return Scaffold(
       backgroundColor: const Color(0xFF0A0E17),
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
+      floatingActionButton: Padding(
+        padding: const EdgeInsets.only(bottom: 72.0),
+        child: FloatingActionButton.extended(
+          onPressed: _testAllPings,
+          backgroundColor: const Color(0xFF00E5FF).withValues(alpha: 0.15),
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: BorderSide(color: const Color(0xFF00E5FF).withValues(alpha: 0.3)),
+        ),
+        icon: _isTestingPings
+            ? const SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(
+                    strokeWidth: 2, color: Color(0xFF00E5FF)))
+            : const Icon(Icons.speed_rounded,
+                color: Color(0xFF00E5FF), size: 20),
+        label: Text(
+          _isTestingPings ? 'Testing...' : 'Test Pings',
+          style: GoogleFonts.inter(
+            color: const Color(0xFF00E5FF),
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        ),
+      ),
       body: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -178,35 +286,39 @@ class _ConfigsScreenState extends State<ConfigsScreen> {
                       letterSpacing: 0.5,
                     ),
                   ),
-                  InkWell(
-                    onTap: _importFromClipboard,
-                    borderRadius: BorderRadius.circular(12),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 10),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF00E5FF).withValues(alpha: 0.1),
+                  Row(
+                    children: [
+                      InkWell(
+                        onTap: _importFromClipboard,
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                            color:
-                                const Color(0xFF00E5FF).withValues(alpha: 0.3)),
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.paste_rounded,
-                              color: const Color(0xFF00E5FF), size: 18),
-                          const SizedBox(width: 8),
-                          Text(
-                            'Import',
-                            style: GoogleFonts.inter(
-                              color: const Color(0xFF00E5FF),
-                              fontWeight: FontWeight.w600,
-                              fontSize: 14,
-                            ),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF00E5FF).withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                                color:
+                                    const Color(0xFF00E5FF).withValues(alpha: 0.3)),
                           ),
-                        ],
+                          child: Row(
+                            children: [
+                              const Icon(Icons.paste_rounded,
+                                  color: Color(0xFF00E5FF), size: 18),
+                              const SizedBox(width: 8),
+                              Text(
+                                'Import',
+                                style: GoogleFonts.inter(
+                                  color: const Color(0xFF00E5FF),
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
-                    ),
+                    ],
                   ),
                 ],
               ),
@@ -328,13 +440,14 @@ class _ConfigsScreenState extends State<ConfigsScreen> {
                                           overflow: TextOverflow.ellipsis,
                                         ),
                                         const SizedBox(height: 4),
-                                        Row(
+                                        Wrap(
+                                          spacing: 8,
+                                          runSpacing: 8,
+                                          crossAxisAlignment: WrapCrossAlignment.center,
                                           children: [
                                             Container(
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                      horizontal: 6,
-                                                      vertical: 2),
+                                              padding: const EdgeInsets.symmetric(
+                                                  horizontal: 6, vertical: 2),
                                               decoration: BoxDecoration(
                                                 color: Colors.white
                                                     .withValues(alpha: 0.1),
@@ -350,6 +463,8 @@ class _ConfigsScreenState extends State<ConfigsScreen> {
                                                 ),
                                               ),
                                             ),
+                                            if (_pingResults.containsKey(config.id))
+                                              _buildPingBadge(_pingResults[config.id]!),
                                           ],
                                         ),
                                       ],
@@ -368,6 +483,14 @@ class _ConfigsScreenState extends State<ConfigsScreen> {
                                         _showEditDialog(config);
                                       } else if (value == 'delete') {
                                         _deleteConfig(config);
+                                      } else if (value == 'copy') {
+                                        Clipboard.setData(ClipboardData(text: config.url));
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          SnackBar(
+                                            backgroundColor: const Color(0xFF131A2A),
+                                            content: Text('Copied to clipboard', style: GoogleFonts.inter(color: const Color(0xFF00E676))),
+                                          ),
+                                        );
                                       }
                                     },
                                     itemBuilder: (context) => [
@@ -376,12 +499,26 @@ class _ConfigsScreenState extends State<ConfigsScreen> {
                                         child: Row(
                                           children: [
                                             const Icon(Icons.edit_rounded,
-                                                color: const Color(0xFF00E5FF),
+                                                color: Color(0xFF00E5FF),
                                                 size: 18),
                                             const SizedBox(width: 12),
                                             Text('Edit',
                                                 style: GoogleFonts.inter(
                                                     color: Colors.white)),
+                                          ],
+                                        ),
+                                      ),
+                                      PopupMenuItem(
+                                        value: 'copy',
+                                        child: Row(
+                                          children: [
+                                            const Icon(Icons.copy_rounded,
+                                                color: Color(0xFF00E676),
+                                                size: 18),
+                                            const SizedBox(width: 12),
+                                            Text('Copy',
+                                                style: GoogleFonts.inter(
+                                                    color: const Color(0xFF00E676))),
                                           ],
                                         ),
                                       ),

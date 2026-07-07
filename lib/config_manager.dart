@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/foundation.dart';
+import 'dart:developer';
 
 class VpnConfig {
   final String id;
@@ -68,7 +69,7 @@ class ConfigManager extends ChangeNotifier {
         final List<dynamic> decoded = jsonDecode(configsJson);
         _configs = decoded.map((e) => VpnConfig.fromJson(e)).toList();
       } catch (e) {
-        print("Error parsing saved configs: \$e");
+        log("Error parsing saved configs: \$e");
         _configs = [];
       }
     }
@@ -121,6 +122,20 @@ class ConfigManager extends ChangeNotifier {
     } else {
       await prefs.remove(_activeConfigKey);
     }
+    notifyListeners();
+  }
+
+  Future<void> sortConfigsByPing(Map<String, int> pings) async {
+    _configs.sort((a, b) {
+      final pingA = pings[a.id] ?? 999999;
+      final pingB = pings[b.id] ?? 999999;
+      
+      final actualA = pingA == -1 ? 999999 : pingA;
+      final actualB = pingB == -1 ? 999999 : pingB;
+
+      return actualA.compareTo(actualB);
+    });
+    await _saveToStorage();
     notifyListeners();
   }
 }

@@ -1,5 +1,5 @@
 import 'dart:convert';
-
+import '../settings_manager.dart';
 class VpnParameters {
   String protocol;
   String remarks;
@@ -64,7 +64,7 @@ class VpnParameters {
     } else if (url.startsWith('vless://') || url.startsWith('trojan://')) {
       return _parseStandardUri(url);
     }
-    throw FormatException('Unsupported or invalid VPN URI scheme');
+    throw const FormatException('Unsupported or invalid VPN URI scheme');
   }
 
   /// Parses vless:// or trojan:// URLs
@@ -206,6 +206,7 @@ class VpnParameters {
 
   /// Generates a strict Xray Core 1.8.0+ compliant JSON configuration string
   String toXrayJson(int socksPort) {
+    final settings = SettingsManager.instance;
     Map<String, dynamic> config = {
       "log": {
         "access": "",
@@ -215,8 +216,8 @@ class VpnParameters {
       },
       "dns": {
         "servers": [
-          "1.1.1.1",
-          "8.8.8.8"
+          settings.primaryDns.isNotEmpty ? settings.primaryDns : "1.1.1.1",
+          if (settings.secondaryDns.isNotEmpty) settings.secondaryDns,
         ]
       },
       "inbounds": [
@@ -231,7 +232,7 @@ class VpnParameters {
             "ip": "127.0.0.1"
           },
           "sniffing": {
-            "enabled": true,
+            "enabled": settings.enableSniffing,
             "destOverride": ["http", "tls"]
           }
         }
@@ -240,11 +241,12 @@ class VpnParameters {
       "routing": {
         "domainStrategy": "AsIs",
         "rules": [
-          {
-            "type": "field",
-            "ip": ["geoip:private"],
-            "outboundTag": "direct"
-          }
+          if (settings.bypassLan)
+            {
+              "type": "field",
+              "ip": ["geoip:private"],
+              "outboundTag": "direct"
+            }
         ]
       }
     };
@@ -340,7 +342,7 @@ class VpnParameters {
     // Security specifics
     if (security == 'tls') {
       streamSettings['tlsSettings'] = {
-        "allowInsecure": allowInsecure == '1' || allowInsecure == 'true' || insecure == '1' || insecure == 'true',
+        "allowInsecure": settings.allowInsecure || allowInsecure == '1' || allowInsecure == 'true' || insecure == '1' || insecure == 'true',
         "serverName": sni.isNotEmpty ? sni : (host.isNotEmpty ? host : address),
       };
       if (alpn.isNotEmpty) {
@@ -357,6 +359,14 @@ class VpnParameters {
         "publicKey": publicKey,
         "shortId": shortId,
         "spiderX": spiderX.isNotEmpty ? spiderX : "/"
+      };
+    }
+
+    bool isXtls = flow.isNotEmpty && flow.contains('xtls');
+    if (settings.enableMux && !isXtls) {
+      proxyOutbound['mux'] = {
+        "enabled": true,
+        "concurrency": settings.muxConcurrency
       };
     }
 
