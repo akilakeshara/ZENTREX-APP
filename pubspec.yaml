@@ -14,6 +14,7 @@ dependencies:
   flutter_v2ray_client:
     path: packages/flutter_v2ray_client
   shared_preferences: ^2.5.5
+  intl: ^0.20.3
 
 dev_dependencies:
   flutter_test:
