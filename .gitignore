@@ -61,3 +61,6 @@ android/key.properties
 # Firebase configs (usually contain sensitive API keys)
 google-services.json
 GoogleService-Info.plist
+
+# Libraries
+*.aar
