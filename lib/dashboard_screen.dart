@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import 'vpn_service.dart';
 import 'config_manager.dart';
+import 'speed_test_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -427,6 +428,38 @@ class _DashboardScreenState extends State<DashboardScreen>
                                     }),
                               ),
                             ],
+                          ),
+                          const SizedBox(height: 24),
+                          // Speed Test Button
+                          SizedBox(
+                            width: double.infinity,
+                            height: 56,
+                            child: ElevatedButton.icon(
+                              icon: const Icon(Icons.speed_rounded, color: Colors.white),
+                              label: Text(
+                                'Run Speed Test',
+                                style: GoogleFonts.inter(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.white,
+                                ),
+                              ),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF131A2A),
+                                foregroundColor: const Color(0xFF00E5FF),
+                                elevation: 0,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                  side: BorderSide(color: const Color(0xFF00E5FF).withValues(alpha: 0.3), width: 1.5),
+                                ),
+                              ),
+                              onPressed: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(builder: (context) => const SpeedTestScreen()),
+                                );
+                              },
+                            ),
                           ),
                         ],
                       ),

@@ -31,15 +31,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
   
   void _saveDns() {
-    _manager.setPrimaryDns(_primaryDnsController.text.trim());
-    _manager.setSecondaryDns(_secondaryDnsController.text.trim());
-    FocusScope.of(context).unfocus();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        backgroundColor: const Color(0xFF131A2A),
-        content: Text('DNS Servers updated.', style: GoogleFonts.inter(color: const Color(0xFF00E5FF))),
-      ),
-    );
+    if (_manager.dnsProvider == 'custom') {
+      _manager.setPrimaryDns(_primaryDnsController.text.trim());
+      _manager.setSecondaryDns(_secondaryDnsController.text.trim());
+      FocusScope.of(context).unfocus();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: const Color(0xFF131A2A),
+          content: Text('Custom DNS saved.', style: GoogleFonts.inter(color: const Color(0xFF00E5FF))),
+        ),
+      );
+    }
   }
 
   @override
@@ -73,26 +75,67 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       const SizedBox(height: 12),
                       _buildSettingsCard(
                         children: [
-                          _buildTextField('Primary DNS', _primaryDnsController),
-                          const SizedBox(height: 12),
-                          _buildTextField('Secondary DNS', _secondaryDnsController),
-                          const SizedBox(height: 12),
-                          Align(
-                            alignment: Alignment.centerRight,
-                            child: ElevatedButton(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF00E5FF).withValues(alpha: 0.1),
-                                foregroundColor: const Color(0xFF00E5FF),
-                                elevation: 0,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                  side: BorderSide(color: const Color(0xFF00E5FF).withValues(alpha: 0.3)),
-                                ),
-                              ),
-                              onPressed: _saveDns,
-                              child: Text('Save DNS', style: GoogleFonts.inter(fontWeight: FontWeight.w600)),
+                          Text(
+                            'DNS Provider',
+                            style: GoogleFonts.inter(
+                              color: Colors.white,
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
                             ),
                           ),
+                          const SizedBox(height: 12),
+                          _buildDnsProviderOption(
+                            id: 'cloudflare',
+                            title: 'Cloudflare (Default)',
+                            subtitle: 'Fast, secure, and privacy-first DNS.',
+                            icon: Icons.cloud_rounded,
+                            iconColor: Colors.orangeAccent,
+                          ),
+                          _buildDnsProviderOption(
+                            id: 'adguard',
+                            title: 'AdGuard DNS',
+                            subtitle: 'Automatically blocks ads and trackers.',
+                            icon: Icons.shield_rounded,
+                            iconColor: Colors.greenAccent,
+                          ),
+                          _buildDnsProviderOption(
+                            id: 'google',
+                            title: 'Google Public DNS',
+                            subtitle: 'Reliable and widely used globally.',
+                            icon: Icons.public_rounded,
+                            iconColor: Colors.blueAccent,
+                          ),
+                          _buildDnsProviderOption(
+                            id: 'custom',
+                            title: 'Custom',
+                            subtitle: 'Manually specify DNS servers.',
+                            icon: Icons.edit_rounded,
+                            iconColor: Colors.white54,
+                          ),
+                          if (_manager.dnsProvider == 'custom') ...[
+                            const SizedBox(height: 12),
+                            _buildDivider(),
+                            _buildTextField('Primary DNS', _primaryDnsController),
+                            const SizedBox(height: 12),
+                            _buildTextField('Secondary DNS', _secondaryDnsController),
+                            const SizedBox(height: 12),
+                            Align(
+                              alignment: Alignment.centerRight,
+                              child: ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFF00E5FF).withValues(alpha: 0.1),
+                                  foregroundColor: const Color(0xFF00E5FF),
+                                  elevation: 0,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                    side: BorderSide(color: const Color(0xFF00E5FF).withValues(alpha: 0.3)),
+                                  ),
+                                ),
+                                onPressed: _saveDns,
+                                child: Text('Save Custom DNS', style: GoogleFonts.inter(fontWeight: FontWeight.w600)),
+                              ),
+                            ),
+                          ],
                         ],
                       ),
                       const SizedBox(height: 24),
@@ -232,6 +275,74 @@ class _SettingsScreenState extends State<SettingsScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: children,
+      ),
+    );
+  }
+
+  Widget _buildDnsProviderOption({
+    required String id,
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required Color iconColor,
+  }) {
+    final isSelected = _manager.dnsProvider == id;
+    return GestureDetector(
+      onTap: () {
+        _manager.setDnsProvider(id);
+        if (id != 'custom') {
+          // Add a short delay to allow provider update
+          Future.delayed(const Duration(milliseconds: 100), () {
+            _primaryDnsController.text = _manager.primaryDns;
+            _secondaryDnsController.text = _manager.secondaryDns;
+          });
+        }
+      },
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? const Color(0xFF00E5FF).withValues(alpha: 0.1)
+              : Colors.black.withValues(alpha: 0.2),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isSelected
+                ? const Color(0xFF00E5FF)
+                : Colors.transparent,
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: iconColor, size: 24),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: GoogleFonts.inter(
+                      color: isSelected ? const Color(0xFF00E5FF) : Colors.white,
+                      fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                      fontSize: 14,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: GoogleFonts.inter(
+                      color: Colors.white54,
+                      fontSize: 11,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (isSelected)
+              const Icon(Icons.check_circle_rounded, color: Color(0xFF00E5FF), size: 20),
+          ],
+        ),
       ),
     );
   }
