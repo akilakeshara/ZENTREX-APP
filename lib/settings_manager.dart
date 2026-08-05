@@ -5,6 +5,7 @@ class SettingsManager extends ChangeNotifier {
   // Keys
   static const String _primaryDnsKey = 'settings_primary_dns';
   static const String _secondaryDnsKey = 'settings_secondary_dns';
+  static const String _dnsProviderKey = 'settings_dns_provider';
   static const String _enableSniffingKey = 'settings_enable_sniffing';
   static const String _enableMuxKey = 'settings_enable_mux';
   static const String _muxConcurrencyKey = 'settings_mux_concurrency';
@@ -17,7 +18,8 @@ class SettingsManager extends ChangeNotifier {
 
   // State
   String _primaryDns = '1.1.1.1';
-  String _secondaryDns = '8.8.8.8';
+  String _secondaryDns = '1.0.0.1';
+  String _dnsProvider = 'cloudflare';
   bool _enableSniffing = true;
   bool _enableMux = false;
   int _muxConcurrency = 8;
@@ -27,6 +29,7 @@ class SettingsManager extends ChangeNotifier {
   // Getters
   String get primaryDns => _primaryDns;
   String get secondaryDns => _secondaryDns;
+  String get dnsProvider => _dnsProvider;
   bool get enableSniffing => _enableSniffing;
   bool get enableMux => _enableMux;
   int get muxConcurrency => _muxConcurrency;
@@ -37,7 +40,8 @@ class SettingsManager extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     
     _primaryDns = prefs.getString(_primaryDnsKey) ?? '1.1.1.1';
-    _secondaryDns = prefs.getString(_secondaryDnsKey) ?? '8.8.8.8';
+    _secondaryDns = prefs.getString(_secondaryDnsKey) ?? '1.0.0.1';
+    _dnsProvider = prefs.getString(_dnsProviderKey) ?? 'cloudflare';
     _enableSniffing = prefs.getBool(_enableSniffingKey) ?? true;
     _enableMux = prefs.getBool(_enableMuxKey) ?? false;
     _muxConcurrency = prefs.getInt(_muxConcurrencyKey) ?? 8;
@@ -58,6 +62,31 @@ class SettingsManager extends ChangeNotifier {
     _secondaryDns = value;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_secondaryDnsKey, value);
+    notifyListeners();
+  }
+
+  Future<void> setDnsProvider(String provider) async {
+    _dnsProvider = provider;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_dnsProviderKey, provider);
+
+    if (provider == 'cloudflare') {
+      _primaryDns = '1.1.1.1';
+      _secondaryDns = '1.0.0.1';
+      await prefs.setString(_primaryDnsKey, '1.1.1.1');
+      await prefs.setString(_secondaryDnsKey, '1.0.0.1');
+    } else if (provider == 'adguard') {
+      _primaryDns = '94.140.14.14';
+      _secondaryDns = '94.140.15.15';
+      await prefs.setString(_primaryDnsKey, '94.140.14.14');
+      await prefs.setString(_secondaryDnsKey, '94.140.15.15');
+    } else if (provider == 'google') {
+      _primaryDns = '8.8.8.8';
+      _secondaryDns = '8.8.4.4';
+      await prefs.setString(_primaryDnsKey, '8.8.8.8');
+      await prefs.setString(_secondaryDnsKey, '8.8.4.4');
+    }
+    
     notifyListeners();
   }
 
