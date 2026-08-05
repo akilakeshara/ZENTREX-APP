@@ -7,8 +7,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'config_manager.dart';
 import 'advanced_edit_screen.dart';
 import 'vpn_service.dart';
-import 'utils/ping_tester.dart';
-import 'utils/vpn_uri_parser.dart';
+
 
 class ConfigsScreen extends StatefulWidget {
   const ConfigsScreen({super.key});
@@ -20,7 +19,7 @@ class ConfigsScreen extends StatefulWidget {
 class _ConfigsScreenState extends State<ConfigsScreen> {
   final ConfigManager _manager = ConfigManager.instance;
   
-  Map<String, int> _pingResults = {};
+  final Map<String, int> _pingResults = {};
   bool _isTestingPings = false;
 
   Future<void> _testAllPings() async {
