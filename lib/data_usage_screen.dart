@@ -231,7 +231,7 @@ class _BarChart extends StatelessWidget {
           month += 12;
           year -= 1;
         }
-        keys.add("${year}-${month.toString().padLeft(2, '0')}");
+        keys.add("$year-${month.toString().padLeft(2, '0')}");
       }
     }
 

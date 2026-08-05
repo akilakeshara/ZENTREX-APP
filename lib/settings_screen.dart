@@ -315,7 +315,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         Switch.adaptive(
           value: value,
           onChanged: onChanged,
-          activeColor: activeColor,
+          activeThumbColor: activeColor,
           activeTrackColor: activeColor.withValues(alpha: 0.3),
           inactiveTrackColor: Colors.black.withValues(alpha: 0.3),
         ),
