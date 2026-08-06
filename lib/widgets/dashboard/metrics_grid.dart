@@ -45,10 +45,10 @@ class MetricsGrid extends StatelessWidget {
 
   Widget _buildGridCard(IconData icon, String label, String value, Color iconColor) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: const Color(0xFF131A2A),
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
       ),
       child: Column(
@@ -56,25 +56,25 @@ class MetricsGrid extends StatelessWidget {
         children: [
           Row(
             children: [
-              Icon(icon, color: iconColor, size: 18),
-              const SizedBox(width: 8),
+              Icon(icon, color: iconColor, size: 16),
+              const SizedBox(width: 6),
               Text(
                 label,
                 style: GoogleFonts.inter(
                   color: Colors.white54,
-                  fontSize: 12,
+                  fontSize: 11,
                   fontWeight: FontWeight.w500,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 8),
           Text(
             value,
             style: GoogleFonts.outfit(
               color: Colors.white,
               fontWeight: FontWeight.w600,
-              fontSize: 16,
+              fontSize: 14,
             ),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
