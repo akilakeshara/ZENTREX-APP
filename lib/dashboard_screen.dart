@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import 'package:lottie/lottie.dart';
+
 import 'vpn_service.dart';
 import 'config_manager.dart';
 import 'speed_test_screen.dart';
@@ -196,25 +198,44 @@ class _DashboardScreenState extends State<DashboardScreen>
             Padding(
               padding:
                   const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
-              child: Column(
+              child: Stack(
+                alignment: Alignment.center,
                 children: [
-                  Text(
-                    'ZENTREX',
-                    style: GoogleFonts.outfit(
-                      fontSize: 32,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                      letterSpacing: 2.0,
-                    ),
+                  const SizedBox(width: double.infinity),
+                  Column(
+                    children: [
+                      Text(
+                        'ZENTREX',
+                        style: GoogleFonts.outfit(
+                          fontSize: 32,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                          letterSpacing: 2.0,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Advanced Network',
+                        style: GoogleFonts.inter(
+                          fontSize: 12,
+                          color: const Color(0xFF00E5FF),
+                          fontWeight: FontWeight.w500,
+                          letterSpacing: 1.2,
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Advanced Network',
-                    style: GoogleFonts.inter(
-                      fontSize: 12,
-                      color: const Color(0xFF00E5FF),
-                      fontWeight: FontWeight.w500,
-                      letterSpacing: 1.2,
+                  Positioned(
+                    right: 0,
+                    child: IconButton(
+                      icon: const Icon(Icons.speed_rounded, color: Color(0xFF00E5FF), size: 28),
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (context) => const SpeedTestScreen()),
+                        );
+                      },
+                      tooltip: 'Speed Test',
                     ),
                   ),
                 ],
@@ -227,35 +248,31 @@ class _DashboardScreenState extends State<DashboardScreen>
                   builder: (context, _) {
                     final activeConfig = ConfigManager.instance.activeConfig;
 
-                    return Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 24.0),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
+                    return LayoutBuilder(
+                      builder: (context, constraints) {
+                        return SingleChildScrollView(
+                          child: ConstrainedBox(
+                            constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 24.0),
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
                           // Connect Button with RepaintBoundary and ScaleTransition
                           RepaintBoundary(
                             child: GestureDetector(
                               onTap: _toggleConnection,
                               child: ScaleTransition(
                                 scale: _pulseAnimation,
-                                child: AnimatedContainer(
-                                  duration: const Duration(milliseconds: 300),
-                                  width: 140,
-                                  height: 140,
+                                child: Container(
+                                  width: 180,
+                                  height: 180,
                                   decoration: BoxDecoration(
                                     shape: BoxShape.circle,
-                                    gradient: LinearGradient(
-                                      colors: _isConnected
-                                          ? [
-                                              const Color(0xFF00E676),
-                                              const Color(0xFF1DE9B6)
-                                            ] // Emerald glow
-                                          : [
-                                              const Color(0xFF00E5FF),
-                                              const Color(0xFF7000FF)
-                                            ], // Cyberpunk Cyan/Purple
-                                      begin: Alignment.topLeft,
-                                      end: Alignment.bottomRight,
+                                    color: const Color(0xFF131A2A),
+                                    border: Border.all(
+                                      color: (_isConnected ? const Color(0xFF00E676) : const Color(0xFF00E5FF)).withValues(alpha: 0.2),
+                                      width: 2,
                                     ),
                                     boxShadow: [
                                       BoxShadow(
@@ -264,19 +281,24 @@ class _DashboardScreenState extends State<DashboardScreen>
                                                 : const Color(0xFF00E5FF))
                                             .withValues(
                                                 alpha:
-                                                    _isConnecting ? 0.6 : 0.4),
-                                        blurRadius: _isConnecting ? 40 : 30,
+                                                    _isConnecting ? 0.5 : 0.15),
+                                        blurRadius: _isConnecting ? 50 : 25,
                                         spreadRadius: 5,
                                       )
                                     ],
                                   ),
                                   child: Center(
-                                    child: Icon(
-                                      _isConnected
-                                          ? Icons.power_settings_new
-                                          : Icons.rocket_launch_rounded,
-                                      size: 56,
-                                      color: Colors.white,
+                                    child: SizedBox(
+                                      width: 140,
+                                      height: 140,
+                                      child: Lottie.asset(
+                                        _isConnected
+                                            ? 'assets/lottie/connected.json'
+                                            : (_isConnecting
+                                                ? 'assets/lottie/connecting.json'
+                                                : 'assets/lottie/disconnected.json'),
+                                        fit: BoxFit.contain,
+                                      ),
                                     ),
                                   ),
                                 ),
@@ -429,40 +451,12 @@ class _DashboardScreenState extends State<DashboardScreen>
                               ),
                             ],
                           ),
-                          const SizedBox(height: 24),
-                          // Speed Test Button
-                          SizedBox(
-                            width: double.infinity,
-                            height: 56,
-                            child: ElevatedButton.icon(
-                              icon: const Icon(Icons.speed_rounded, color: Colors.white),
-                              label: Text(
-                                'Run Speed Test',
-                                style: GoogleFonts.inter(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w600,
-                                  color: Colors.white,
-                                ),
+                                ],
                               ),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF131A2A),
-                                foregroundColor: const Color(0xFF00E5FF),
-                                elevation: 0,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(16),
-                                  side: BorderSide(color: const Color(0xFF00E5FF).withValues(alpha: 0.3), width: 1.5),
-                                ),
-                              ),
-                              onPressed: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(builder: (context) => const SpeedTestScreen()),
-                                );
-                              },
                             ),
                           ),
-                        ],
-                      ),
+                        );
+                      }
                     );
                   }),
             ),

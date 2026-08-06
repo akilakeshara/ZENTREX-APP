@@ -98,18 +98,27 @@ class SpeedTester {
 
       // 3. Measure Upload Speed
       final random = Random();
-      final uploadData = List<int>.generate(_uploadBytes, (i) => random.nextInt(256));
+      const chunkSize = 500000; // 500KB
+      final chunkData = Uint8List(chunkSize);
+      for (int i = 0; i < chunkData.length; i++) {
+        chunkData[i] = random.nextInt(256);
+      }
 
       final upStart = DateTime.now();
       final upReq = await _httpClient!.postUrl(Uri.parse(_upUrl));
+      upReq.contentLength = _uploadBytes;
       
       int uploaded = 0;
-      const chunkSize = 500000; // 500KB
       
-      for (int i = 0; i < uploadData.length; i += chunkSize) {
-        final end = (i + chunkSize < uploadData.length) ? i + chunkSize : uploadData.length;
-        upReq.add(uploadData.sublist(i, end));
-        uploaded += (end - i);
+      while (uploaded < _uploadBytes) {
+        if (!_isTesting) break; // Check if cancelled
+        
+        final bytesToSend = (_uploadBytes - uploaded < chunkData.length) 
+            ? _uploadBytes - uploaded 
+            : chunkData.length;
+            
+        upReq.add(Uint8List.view(chunkData.buffer, 0, bytesToSend));
+        uploaded += bytesToSend;
         
         await Future.delayed(const Duration(milliseconds: 10));
         
