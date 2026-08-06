@@ -1,4 +1,3 @@
-
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -8,6 +7,8 @@ import 'config_manager.dart';
 import 'advanced_edit_screen.dart';
 import 'vpn_service.dart';
 
+import 'widgets/configs/configs_header.dart';
+import 'widgets/configs/config_list_item.dart';
 
 class ConfigsScreen extends StatefulWidget {
   const ConfigsScreen({super.key});
@@ -205,33 +206,6 @@ class _ConfigsScreenState extends State<ConfigsScreen> {
     }
   }
 
-  Widget _buildPingBadge(int ping) {
-    Color color;
-    String text;
-    if (ping == -1) {
-      color = Colors.redAccent;
-      text = 'Timeout';
-    } else if (ping < 150) {
-      color = const Color(0xFF00E676);
-      text = '${ping}ms';
-    } else if (ping < 300) {
-      color = Colors.orangeAccent;
-      text = '${ping}ms';
-    } else {
-      color = Colors.redAccent;
-      text = '${ping}ms';
-    }
-
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(Icons.flash_on_rounded, color: color, size: 12),
-        const SizedBox(width: 2),
-        Text(text, style: GoogleFonts.inter(color: color, fontSize: 10, fontWeight: FontWeight.bold)),
-      ],
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final configs = _manager.configs;
@@ -271,57 +245,7 @@ class _ConfigsScreenState extends State<ConfigsScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Padding(
-              padding: const EdgeInsets.all(24.0),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Configurations',
-                    style: GoogleFonts.outfit(
-                      fontSize: 28,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                      letterSpacing: 0.5,
-                    ),
-                  ),
-                  Row(
-                    children: [
-                      InkWell(
-                        onTap: _importFromClipboard,
-                        borderRadius: BorderRadius.circular(12),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 16, vertical: 10),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF00E5FF).withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                                color:
-                                    const Color(0xFF00E5FF).withValues(alpha: 0.3)),
-                          ),
-                          child: Row(
-                            children: [
-                              const Icon(Icons.paste_rounded,
-                                  color: Color(0xFF00E5FF), size: 18),
-                              const SizedBox(width: 8),
-                              Text(
-                                'Import',
-                                style: GoogleFonts.inter(
-                                  color: const Color(0xFF00E5FF),
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: 14,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
+            ConfigsHeader(onImport: _importFromClipboard),
             Expanded(
               child: configs.isEmpty
                   ? Center(
@@ -350,197 +274,22 @@ class _ConfigsScreenState extends State<ConfigsScreen> {
                         final config = configs[index];
                         final isActive = activeConfig?.id == config.id;
 
-                        return Dismissible(
-                          key: Key(config.id),
-                          direction: DismissDirection.endToStart,
-                          background: Container(
-                            margin: const EdgeInsets.only(bottom: 16),
-                            padding: const EdgeInsets.symmetric(horizontal: 20),
-                            decoration: BoxDecoration(
-                              color: Colors.redAccent.withValues(alpha: 0.8),
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            alignment: Alignment.centerRight,
-                            child: const Icon(Icons.delete_outline,
-                                color: Colors.white),
-                          ),
-                          confirmDismiss: (direction) async {
-                            return _canModifyConfig();
+                        return ConfigListItem(
+                          config: config,
+                          isActive: isActive,
+                          ping: _pingResults[config.id],
+                          onActivate: (c) {
+                            if (!_canModifyConfig()) return;
+                            _manager.setActiveConfig(c.id);
+                            _refresh();
                           },
-                          onDismissed: (_) {
+                          onEdit: _showEditDialog,
+                          onDelete: _deleteConfig,
+                          confirmDismiss: (c) async => _canModifyConfig(),
+                          onDismissed: () {
                             _manager.removeConfig(config.id);
                             _refresh();
                           },
-                          child: GestureDetector(
-                            onTap: () {
-                              if (!_canModifyConfig()) return;
-                              _manager.setActiveConfig(config.id);
-                              _refresh();
-                            },
-                            child: Container(
-                              margin: const EdgeInsets.only(bottom: 16),
-                              padding: const EdgeInsets.all(16),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF131A2A),
-                                borderRadius: BorderRadius.circular(20),
-                                border: Border.all(
-                                  color: isActive
-                                      ? const Color(0xFF00E5FF)
-                                      : Colors.white.withValues(alpha: 0.05),
-                                  width: isActive ? 1.5 : 1.0,
-                                ),
-                                boxShadow: isActive
-                                    ? [
-                                        BoxShadow(
-                                          color: const Color(0xFF00E5FF)
-                                              .withValues(alpha: 0.15),
-                                          blurRadius: 15,
-                                          spreadRadius: 2,
-                                        )
-                                      ]
-                                    : null,
-                              ),
-                              child: Row(
-                                children: [
-                                  Container(
-                                    width: 44,
-                                    height: 44,
-                                    decoration: BoxDecoration(
-                                      color: isActive
-                                          ? Colors.cyanAccent
-                                              .withValues(alpha: 0.2)
-                                          : Colors.white.withValues(alpha: 0.1),
-                                      shape: BoxShape.circle,
-                                    ),
-                                    child: Icon(
-                                      isActive
-                                          ? Icons.check_circle_rounded
-                                          : Icons.public_rounded,
-                                      color: isActive
-                                          ? const Color(0xFF00E5FF)
-                                          : Colors.white38,
-                                      size: 24,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 16),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          config.name,
-                                          style: GoogleFonts.inter(
-                                            color: Colors.white,
-                                            fontWeight: FontWeight.w600,
-                                            fontSize: 16,
-                                          ),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                        const SizedBox(height: 4),
-                                        Wrap(
-                                          spacing: 8,
-                                          runSpacing: 8,
-                                          crossAxisAlignment: WrapCrossAlignment.center,
-                                          children: [
-                                            Container(
-                                              padding: const EdgeInsets.symmetric(
-                                                  horizontal: 6, vertical: 2),
-                                              decoration: BoxDecoration(
-                                                color: Colors.white
-                                                    .withValues(alpha: 0.1),
-                                                borderRadius:
-                                                    BorderRadius.circular(4),
-                                              ),
-                                              child: Text(
-                                                config.protocol,
-                                                style: GoogleFonts.inter(
-                                                  color: Colors.white70,
-                                                  fontWeight: FontWeight.w500,
-                                                  fontSize: 10,
-                                                ),
-                                              ),
-                                            ),
-                                            if (_pingResults.containsKey(config.id))
-                                              _buildPingBadge(_pingResults[config.id]!),
-                                          ],
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  PopupMenuButton<String>(
-                                    icon: Icon(Icons.more_vert_rounded,
-                                        color: Colors.white
-                                            .withValues(alpha: 0.5)),
-                                    color: const Color(0xFF1E293B),
-                                    shape: RoundedRectangleBorder(
-                                        borderRadius:
-                                            BorderRadius.circular(12)),
-                                    onSelected: (value) {
-                                      if (value == 'edit') {
-                                        _showEditDialog(config);
-                                      } else if (value == 'delete') {
-                                        _deleteConfig(config);
-                                      } else if (value == 'copy') {
-                                        Clipboard.setData(ClipboardData(text: config.url));
-                                        ScaffoldMessenger.of(context).showSnackBar(
-                                          SnackBar(
-                                            backgroundColor: const Color(0xFF131A2A),
-                                            content: Text('Copied to clipboard', style: GoogleFonts.inter(color: const Color(0xFF00E676))),
-                                          ),
-                                        );
-                                      }
-                                    },
-                                    itemBuilder: (context) => [
-                                      PopupMenuItem(
-                                        value: 'edit',
-                                        child: Row(
-                                          children: [
-                                            const Icon(Icons.edit_rounded,
-                                                color: Color(0xFF00E5FF),
-                                                size: 18),
-                                            const SizedBox(width: 12),
-                                            Text('Edit',
-                                                style: GoogleFonts.inter(
-                                                    color: Colors.white)),
-                                          ],
-                                        ),
-                                      ),
-                                      PopupMenuItem(
-                                        value: 'copy',
-                                        child: Row(
-                                          children: [
-                                            const Icon(Icons.copy_rounded,
-                                                color: Color(0xFF00E676),
-                                                size: 18),
-                                            const SizedBox(width: 12),
-                                            Text('Copy',
-                                                style: GoogleFonts.inter(
-                                                    color: const Color(0xFF00E676))),
-                                          ],
-                                        ),
-                                      ),
-                                      PopupMenuItem(
-                                        value: 'delete',
-                                        child: Row(
-                                          children: [
-                                            const Icon(Icons.delete_rounded,
-                                                color: Colors.redAccent,
-                                                size: 18),
-                                            const SizedBox(width: 12),
-                                            Text('Delete',
-                                                style: GoogleFonts.inter(
-                                                    color: Colors.redAccent)),
-                                          ],
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
                         );
                       },
                     ),

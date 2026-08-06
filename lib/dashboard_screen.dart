@@ -3,11 +3,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-import 'package:lottie/lottie.dart';
-
 import 'vpn_service.dart';
 import 'config_manager.dart';
-import 'speed_test_screen.dart';
+
+import 'widgets/dashboard/dashboard_header.dart';
+import 'widgets/dashboard/connection_button.dart';
+import 'widgets/dashboard/metrics_grid.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -37,7 +38,6 @@ class _DashboardScreenState extends State<DashboardScreen>
   StreamSubscription? _vpnStatusSub;
   static const _memoryChannel = MethodChannel('com.zentrex/memory');
 
-  // Animation for the connect button pulsing
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
 
@@ -90,7 +90,6 @@ class _DashboardScreenState extends State<DashboardScreen>
       bool newIsConnecting =
           status.state == "DISCONNECTED" ? false : _isConnecting;
 
-      // Handle button pulsing
       if (newIsConnected || newIsConnecting) {
         if (!_pulseController.isAnimating) {
           _pulseController.repeat(reverse: true);
@@ -169,24 +168,6 @@ class _DashboardScreenState extends State<DashboardScreen>
     }
   }
 
-  String _extractHost(String url) {
-    try {
-      final uri = Uri.parse(url);
-      return uri.host;
-    } catch (_) {
-      return "Unknown";
-    }
-  }
-
-  String _formatBytes(int bytes) {
-    if (bytes < 1024) return '$bytes B';
-    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
-    if (bytes < 1024 * 1024 * 1024) {
-      return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
-    }
-    return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(2)} GB';
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -194,54 +175,7 @@ class _DashboardScreenState extends State<DashboardScreen>
       body: SafeArea(
         child: Column(
           children: [
-            // Header
-            Padding(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
-              child: Stack(
-                alignment: Alignment.center,
-                children: [
-                  const SizedBox(width: double.infinity),
-                  Column(
-                    children: [
-                      Text(
-                        'ZENTREX',
-                        style: GoogleFonts.outfit(
-                          fontSize: 32,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                          letterSpacing: 2.0,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Advanced Network',
-                        style: GoogleFonts.inter(
-                          fontSize: 12,
-                          color: const Color(0xFF00E5FF),
-                          fontWeight: FontWeight.w500,
-                          letterSpacing: 1.2,
-                        ),
-                      ),
-                    ],
-                  ),
-                  Positioned(
-                    right: 0,
-                    child: IconButton(
-                      icon: const Icon(Icons.speed_rounded, color: Color(0xFF00E5FF), size: 28),
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (context) => const SpeedTestScreen()),
-                        );
-                      },
-                      tooltip: 'Speed Test',
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
+            const DashboardHeader(),
             Expanded(
               child: ListenableBuilder(
                   listenable: ConfigManager.instance,
@@ -258,199 +192,69 @@ class _DashboardScreenState extends State<DashboardScreen>
                               child: Column(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                          // Connect Button with RepaintBoundary and ScaleTransition
-                          RepaintBoundary(
-                            child: GestureDetector(
-                              onTap: _toggleConnection,
-                              child: ScaleTransition(
-                                scale: _pulseAnimation,
-                                child: Container(
-                                  width: 180,
-                                  height: 180,
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    color: const Color(0xFF131A2A),
-                                    border: Border.all(
-                                      color: (_isConnected ? const Color(0xFF00E676) : const Color(0xFF00E5FF)).withValues(alpha: 0.2),
-                                      width: 2,
-                                    ),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: (_isConnected
-                                                ? const Color(0xFF00E676)
-                                                : const Color(0xFF00E5FF))
-                                            .withValues(
-                                                alpha:
-                                                    _isConnecting ? 0.5 : 0.15),
-                                        blurRadius: _isConnecting ? 50 : 25,
-                                        spreadRadius: 5,
-                                      )
-                                    ],
+                                  ConnectionButton(
+                                    isConnected: _isConnected,
+                                    isConnecting: _isConnecting,
+                                    onTap: _toggleConnection,
+                                    pulseAnimation: _pulseAnimation,
                                   ),
-                                  child: Center(
-                                    child: SizedBox(
-                                      width: 140,
-                                      height: 140,
-                                      child: Lottie.asset(
-                                        _isConnected
-                                            ? 'assets/lottie/connected.json'
-                                            : (_isConnecting
-                                                ? 'assets/lottie/connecting.json'
-                                                : 'assets/lottie/disconnected.json'),
-                                        fit: BoxFit.contain,
-                                      ),
+                                  const SizedBox(height: 24),
+                                  Text(
+                                    _isConnected
+                                        ? 'CONNECTED'
+                                        : (_isConnecting
+                                            ? 'CONNECTING...'
+                                            : 'DISCONNECTED'),
+                                    style: GoogleFonts.inter(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 14,
+                                      letterSpacing: 2.0,
+                                      color: _isConnected
+                                          ? const Color(0xFF00E676)
+                                          : Colors.white54,
                                     ),
                                   ),
-                                ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 24),
-
-                          // Status Text
-                          Text(
-                            _isConnected
-                                ? 'CONNECTED'
-                                : (_isConnecting
-                                    ? 'CONNECTING...'
-                                    : 'DISCONNECTED'),
-                            style: GoogleFonts.inter(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 14,
-                              letterSpacing: 2.0,
-                              color: _isConnected
-                                  ? const Color(0xFF00E676)
-                                  : Colors.white54,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            activeConfig?.name ?? 'No Config Selected',
-                            style: GoogleFonts.outfit(
-                              fontSize: 22,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.white,
-                            ),
-                            textAlign: TextAlign.center,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-
-                          // Reserve fixed height space for session duration to prevent layout jumping
-                          const SizedBox(height: 4),
-                          SizedBox(
-                            height: 20,
-                            child: _isConnected
-                                ? ValueListenableBuilder<String>(
-                                    valueListenable: _sessionDuration,
-                                    builder: (context, duration, _) {
-                                      return Text(
-                                        'Session Duration: $duration',
-                                        style: GoogleFonts.inter(
-                                          color: Colors.white54,
-                                          fontSize: 12,
-                                        ),
-                                      );
-                                    },
-                                  )
-                                : const SizedBox.shrink(),
-                          ),
-
-                          const SizedBox(height: 36),
-
-                          // Metrics Grid
-                          Row(
-                            children: [
-                              Expanded(
-                                child: _buildGridCard(
-                                    Icons.public_rounded,
-                                    'Address',
-                                    _extractHost(activeConfig?.url ?? ''),
-                                    Colors.blueAccent),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: _buildGridCard(
-                                    Icons.security_rounded,
-                                    'Protocol',
-                                    activeConfig?.protocol ?? 'Unknown',
-                                    Colors.pinkAccent),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 12),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: ValueListenableBuilder<int>(
-                                    valueListenable: _downloadBytes,
-                                    builder: (context, dl, _) {
-                                      return _buildGridCard(
-                                          Icons.arrow_downward_rounded,
-                                          'Download',
-                                          _formatBytes(dl),
-                                          const Color(0xFF00E5FF));
-                                    }),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: ValueListenableBuilder<int>(
-                                    valueListenable: _uploadBytes,
-                                    builder: (context, ul, _) {
-                                      return _buildGridCard(
-                                          Icons.arrow_upward_rounded,
-                                          'Upload',
-                                          _formatBytes(ul),
-                                          const Color(0xFF7000FF));
-                                    }),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 12),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: InkWell(
-                                  onTap: _measurePing,
-                                  borderRadius: BorderRadius.circular(20),
-                                  child: ValueListenableBuilder<bool>(
-                                      valueListenable: _isPinging,
-                                      builder: (context, isPinging, _) {
-                                        return ValueListenableBuilder<int>(
-                                            valueListenable: _ping,
-                                            builder: (context, pingValue, _) {
-                                              return _buildGridCard(
-                                                Icons.network_ping_rounded,
-                                                'Ping',
-                                                !_isConnected
-                                                    ? 'Offline'
-                                                    : (isPinging
-                                                        ? 'Wait..'
-                                                        : (pingValue > 0
-                                                            ? '${pingValue}ms'
-                                                            : 'Tap')),
-                                                _isConnected && pingValue > 0
-                                                    ? const Color(0xFF00E676)
-                                                    : Colors.white54,
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    activeConfig?.name ?? 'No Config Selected',
+                                    style: GoogleFonts.outfit(
+                                      fontSize: 22,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.white,
+                                    ),
+                                    textAlign: TextAlign.center,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  const SizedBox(height: 4),
+                                  SizedBox(
+                                    height: 20,
+                                    child: _isConnected
+                                        ? ValueListenableBuilder<String>(
+                                            valueListenable: _sessionDuration,
+                                            builder: (context, duration, _) {
+                                              return Text(
+                                                'Session Duration: $duration',
+                                                style: GoogleFonts.inter(
+                                                  color: Colors.white54,
+                                                  fontSize: 12,
+                                                ),
                                               );
-                                            });
-                                      }),
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: ValueListenableBuilder<int>(
-                                    valueListenable: _appMemBytes,
-                                    builder: (context, memValue, _) {
-                                      return _buildGridCard(
-                                          Icons.memory_rounded,
-                                          'App RAM',
-                                          _formatBytes(memValue),
-                                          Colors.orangeAccent);
-                                    }),
-                              ),
-                            ],
-                          ),
+                                            },
+                                          )
+                                        : const SizedBox.shrink(),
+                                  ),
+                                  const SizedBox(height: 36),
+                                  MetricsGrid(
+                                    activeConfig: activeConfig,
+                                    downloadBytesListenable: _downloadBytes,
+                                    uploadBytesListenable: _uploadBytes,
+                                    pingListenable: _ping,
+                                    isPingingListenable: _isPinging,
+                                    appMemBytesListenable: _appMemBytes,
+                                    isConnected: _isConnected,
+                                    onPingTap: _measurePing,
+                                  ),
                                 ],
                               ),
                             ),
@@ -462,48 +266,6 @@ class _DashboardScreenState extends State<DashboardScreen>
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildGridCard(
-      IconData icon, String label, String value, Color iconColor) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: const Color(0xFF131A2A), // Elevated dark blue
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(icon, color: iconColor, size: 18),
-              const SizedBox(width: 8),
-              Text(
-                label,
-                style: GoogleFonts.inter(
-                  color: Colors.white54,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Text(
-            value,
-            style: GoogleFonts.outfit(
-              color: Colors.white,
-              fontWeight: FontWeight.w600,
-              fontSize: 16,
-            ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ],
       ),
     );
   }
