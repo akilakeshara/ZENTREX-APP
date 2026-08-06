@@ -226,30 +226,32 @@ class _SpeedTestScreenState extends State<SpeedTestScreen> with TickerProviderSt
         ),
         borderData: FlBorderData(show: false),
         lineBarsData: [
-          LineChartBarData(
-            spots: _downloadSpots,
-            isCurved: true,
-            color: const Color(0xFF00E5FF),
-            barWidth: 3,
-            isStrokeCapRound: true,
-            dotData: const FlDotData(show: false),
-            belowBarData: BarAreaData(
-              show: true,
-              color: const Color(0xFF00E5FF).withValues(alpha: 0.2),
+          if (_downloadSpots.isNotEmpty)
+            LineChartBarData(
+              spots: _downloadSpots,
+              isCurved: true,
+              color: const Color(0xFF00E5FF),
+              barWidth: 3,
+              isStrokeCapRound: true,
+              dotData: const FlDotData(show: false),
+              belowBarData: BarAreaData(
+                show: true,
+                color: const Color(0xFF00E5FF).withValues(alpha: 0.2),
+              ),
             ),
-          ),
-          LineChartBarData(
-            spots: _uploadSpots,
-            isCurved: true,
-            color: const Color(0xFF7000FF),
-            barWidth: 3,
-            isStrokeCapRound: true,
-            dotData: const FlDotData(show: false),
-            belowBarData: BarAreaData(
-              show: true,
-              color: const Color(0xFF7000FF).withValues(alpha: 0.2),
+          if (_uploadSpots.isNotEmpty)
+            LineChartBarData(
+              spots: _uploadSpots,
+              isCurved: true,
+              color: const Color(0xFF7000FF),
+              barWidth: 3,
+              isStrokeCapRound: true,
+              dotData: const FlDotData(show: false),
+              belowBarData: BarAreaData(
+                show: true,
+                color: const Color(0xFF7000FF).withValues(alpha: 0.2),
+              ),
             ),
-          ),
         ],
       ),
     );
