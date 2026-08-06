@@ -188,7 +188,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                           child: ConstrainedBox(
                             constraints: BoxConstraints(minHeight: constraints.maxHeight),
                             child: Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 24.0),
+                              padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 8.0),
                               child: Column(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
@@ -198,7 +198,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                                     onTap: _toggleConnection,
                                     pulseAnimation: _pulseAnimation,
                                   ),
-                                  const SizedBox(height: 24),
+                                  const SizedBox(height: 16),
                                   Text(
                                     _isConnected
                                         ? 'CONNECTED'
@@ -207,18 +207,18 @@ class _DashboardScreenState extends State<DashboardScreen>
                                             : 'DISCONNECTED'),
                                     style: GoogleFonts.inter(
                                       fontWeight: FontWeight.bold,
-                                      fontSize: 14,
+                                      fontSize: 12,
                                       letterSpacing: 2.0,
                                       color: _isConnected
                                           ? const Color(0xFF00E676)
                                           : Colors.white54,
                                     ),
                                   ),
-                                  const SizedBox(height: 8),
+                                  const SizedBox(height: 4),
                                   Text(
                                     activeConfig?.name ?? 'No Config Selected',
                                     style: GoogleFonts.outfit(
-                                      fontSize: 22,
+                                      fontSize: 18,
                                       fontWeight: FontWeight.w600,
                                       color: Colors.white,
                                     ),
@@ -226,9 +226,9 @@ class _DashboardScreenState extends State<DashboardScreen>
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                   ),
-                                  const SizedBox(height: 4),
+                                  const SizedBox(height: 2),
                                   SizedBox(
-                                    height: 20,
+                                    height: 18,
                                     child: _isConnected
                                         ? ValueListenableBuilder<String>(
                                             valueListenable: _sessionDuration,
@@ -237,14 +237,14 @@ class _DashboardScreenState extends State<DashboardScreen>
                                                 'Session Duration: $duration',
                                                 style: GoogleFonts.inter(
                                                   color: Colors.white54,
-                                                  fontSize: 12,
+                                                  fontSize: 11,
                                                 ),
                                               );
                                             },
                                           )
                                         : const SizedBox.shrink(),
                                   ),
-                                  const SizedBox(height: 36),
+                                  const SizedBox(height: 24),
                                   MetricsGrid(
                                     activeConfig: activeConfig,
                                     downloadBytesListenable: _downloadBytes,
